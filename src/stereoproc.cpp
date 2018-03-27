@@ -56,17 +56,17 @@ void Stereoproc::onInit()
     boost::lock_guard<boost::mutex> lock(connect_mutex_);
     int publisher_queue_size;
     private_nh.param("publisher_queue_size", publisher_queue_size, 1);
-    pub_mono_left_ = nh.advertise<sensor_msgs::Image>("left/image_mono", publisher_queue_size, connect_cb, connect_cb);
-    pub_mono_right_ = nh.advertise<sensor_msgs::Image>("right/image_mono", publisher_queue_size, connect_cb, connect_cb);
-    pub_color_left_ = nh.advertise<sensor_msgs::Image>("left/image_color", publisher_queue_size, connect_cb, connect_cb);
-    pub_color_right_ = nh.advertise<sensor_msgs::Image>("right/image_color", publisher_queue_size, connect_cb, connect_cb);
-    pub_mono_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_mono", publisher_queue_size, connect_cb, connect_cb);
-    pub_color_rect_left_ = nh.advertise<sensor_msgs::Image>("left/rect_color", publisher_queue_size, connect_cb, connect_cb);
-    pub_mono_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_mono", publisher_queue_size, connect_cb, connect_cb);
-    pub_color_rect_right_ = nh.advertise<sensor_msgs::Image>("right/rect_color", publisher_queue_size, connect_cb, connect_cb);
-    pub_disparity_ = nh.advertise<stereo_msgs::DisparityImage>("disparity", publisher_queue_size, connect_cb, connect_cb);
-    pub_disparity_vis_ = nh.advertise<sensor_msgs::Image>("disparity_vis", publisher_queue_size, connect_cb, connect_cb);
-    pub_pointcloud_ = nh.advertise<sensor_msgs::PointCloud2>("pointcloud", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_left_ = private_nh.advertise<sensor_msgs::Image>("left/image_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_right_ = private_nh.advertise<sensor_msgs::Image>("right/image_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_left_ = private_nh.advertise<sensor_msgs::Image>("left/image_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_right_ = private_nh.advertise<sensor_msgs::Image>("right/image_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_rect_left_ = private_nh.advertise<sensor_msgs::Image>("left/rect_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_rect_left_ = private_nh.advertise<sensor_msgs::Image>("left/rect_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_rect_right_ = private_nh.advertise<sensor_msgs::Image>("right/rect_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_color_rect_right_ = private_nh.advertise<sensor_msgs::Image>("right/rect_color", publisher_queue_size, connect_cb, connect_cb);
+    pub_disparity_ = private_nh.advertise<stereo_msgs::DisparityImage>("disparity", publisher_queue_size, connect_cb, connect_cb);
+    pub_disparity_vis_ = private_nh.advertise<sensor_msgs::Image>("disparity_vis", publisher_queue_size, connect_cb, connect_cb);
+    pub_pointcloud_ = private_nh.advertise<sensor_msgs::PointCloud2>("pointcloud", publisher_queue_size, connect_cb, connect_cb);
 
     cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
 }
@@ -304,7 +304,7 @@ void Stereoproc::imageCb(
         //allocate cpu-side resource
         filter_buf_.create(l_rect_mono.size(), CV_16SC1);
         //enqueueDownload
-        disparity.convertTo(disparity_16s, CV_16SC1, 16, l_strm);
+        disparity.convertTo(disparity_16s, CV_16SC1, 1, l_strm);
         disparity_16s.download(filter_buf_, l_strm);
         l_strm.waitForCompletion();
         filterSpeckles();
@@ -527,11 +527,11 @@ void Stereoproc::configCb(Config &config, uint32_t level)
     if(bilateral_filter_.empty())
     {
         bilateral_filter_ = cv::cuda::createDisparityBilateralFilter(config.filter_ndisp, config.filter_radius, config.filter_iters);
-    } else {
-        bilateral_filter_->setNumDisparities(config.filter_ndisp);
-        bilateral_filter_->setRadius(config.filter_radius);
-        bilateral_filter_->setNumIters(config.filter_iters);
     }
+    bilateral_filter_->setNumDisparities(config.filter_ndisp);
+    bilateral_filter_->setRadius(config.filter_radius);
+    bilateral_filter_->setNumIters(config.filter_iters);
+
     bilateral_filter_->setEdgeThreshold(config.filter_edge_threshold);
     bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
     bilateral_filter_->setSigmaRange(config.filter_sigma_range);

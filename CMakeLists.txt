@@ -18,9 +18,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV 
-    PATHS /opt/opencv_contradict/
+    PATHS /usr/local_ros
     NO_DEFAULT_PATH 
-	REQUIRED)
+    REQUIRED)
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -177,3 +177,14 @@ install(DIRECTORY
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+################################################
+#Add all files in subdirectories of the project in
+# a dummy_target so qtcreator have access to all files
+FILE(GLOB_RECURSE extra_files
+#    ${CMAKE_SOURCE_DIR}/*)
+${CMAKE_SOURCE_DIR}/launch/*
+${CMAKE_SOURCE_DIR}/cfg/*
+)
+add_custom_target(dummy_${PROJECT_NAME} SOURCES ${extra_files})
+################################################

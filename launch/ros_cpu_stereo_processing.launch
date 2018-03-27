@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <node
+        pkg="stereo_image_proc"
+        type="stereo_image_proc"
+        name="stereo_ros"
+        ns="/loitor_stereo_visensor"
+        args=""
+        output="screen"
+    >
+    </node>
+</launch>
