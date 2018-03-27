@@ -304,7 +304,7 @@ void Stereoproc::imageCb(
         //allocate cpu-side resource
         filter_buf_.create(l_rect_mono.size(), CV_16SC1);
         //enqueueDownload
-        disparity.convertTo(disparity_16s, CV_16SC1, 1, l_strm);
+        disparity.convertTo(disparity_16s, CV_16SC1, 16, l_strm);
         disparity_16s.download(filter_buf_, l_strm);
         l_strm.waitForCompletion();
         filterSpeckles();
