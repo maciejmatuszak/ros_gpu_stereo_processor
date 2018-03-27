@@ -68,7 +68,6 @@ class StereoprocNodelet : public nodelet::Nodelet
   // Processing state (note: only safe because we're single-threaded!)
   image_geometry::StereoCameraModel model_;
 
-  cv::Ptr<cv::cuda::StereoBM> block_matcher_;
   cv::Ptr<cv::cuda::DisparityBilateralFilter> bilateral_filter_;
   const int block_matcher_min_disparity_ = 0;
 

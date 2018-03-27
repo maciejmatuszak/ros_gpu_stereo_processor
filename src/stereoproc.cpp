@@ -181,112 +181,36 @@ void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, con
 
     if (connected_.RectifyMonoRight)
     {
-        GPUSender::Ptr t(new GPUSender(r_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_right_));
-        senders.push_back(t);
-        t->enqueueSend(r_rect_mono, r_strm);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_MONO, r_raw_msg, sensor_msgs::image_encodings::MONO8, pub_mono_rect_right_);
     }
 
     if (connected_.RectifyColorLeft || connected_.Pointcloud)
     {
-        model_.left().rectifyImageGPU(l_color, l_rect_color, cv::INTER_LINEAR, l_strm);
+        stereoProcessor_->rectifyImage(GPU_MAT_SRC_L_COLOR, GPU_MAT_SRC_L_RECT_COLOR, cv::INTER_LINEAR);
     }
     if (connected_.RectifyColorRight)
     {
-        model_.right().rectifyImageGPU(r_color, r_rect_color, cv::INTER_LINEAR, r_strm);
+        stereoProcessor_->rectifyImage(GPU_MAT_SRC_R_COLOR, GPU_MAT_SRC_R_RECT_COLOR, cv::INTER_LINEAR);
     }
 
     if (connected_.RectifyColorLeft)
     {
-        GPUSender::Ptr t(new GPUSender(l_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_left_));
-        senders.push_back(t);
-        t->enqueueSend(l_rect_color, l_strm);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_RECT_COLOR, l_raw_msg, sensor_msgs::image_encodings::BGR8, pub_color_rect_left_);
     }
 
     if (connected_.RectifyColorRight)
     {
-        GPUSender::Ptr t(new GPUSender(r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_right_));
-        senders.push_back(t);
-        t->enqueueSend(r_rect_color, r_strm);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, pub_color_rect_right_);
     }
 
-    cv::cuda::GpuMat disparity;
-    cv::cuda::GpuMat disparity_16s;
-    cv::cuda::GpuMat disparity_filtered;
     if (connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
-        r_strm.waitForCompletion();
-        block_matcher_->compute(l_rect_mono, r_rect_mono, disparity, l_strm);
-        // allocate cpu-side resource
-        filter_buf_.create(l_rect_mono.size(), CV_16SC1);
-        // enqueueDownload
-        disparity.convertTo(disparity_16s, CV_16SC1, 16, l_strm);
-        disparity_16s.download(filter_buf_, l_strm);
-        l_strm.waitForCompletion();
-        filterSpeckles();
-        // enqueueUpload
-        disparity_16s.upload(filter_buf_, l_strm);
-        if (bilateral_filter_enabled_)
-        {
-            bilateral_filter_->apply(disparity_16s, l_rect_mono, disparity_filtered);
-            disparity_filtered.convertTo(disparity, CV_32FC1, 1 / 16.);
-        }
-        else
-        {
-            disparity_16s.convertTo(disparity, CV_32FC1, 1 / 16.);
-        }
+        stereoProcessor_->computeDisparity();
     }
 
     if (connected_.Disparity)
     {
-        cv::cuda::GpuMat disparity_float;
-        if (disparity.type() != CV_32F)
-            disparity.convertTo(disparity_float, CV_32FC1);
-        else
-            disparity_float = disparity;
-
-        // Adjust for any x-offset between the principal points: d' = d - (cx_l - cx_r)
-        double cx_l = model_.left().cx();
-        double cx_r = model_.right().cx();
-        if (cx_l != cx_r)
-        {
-            cv::cuda::subtract(disparity_float, cv::Scalar(cx_l - cx_r), disparity_float, cv::cuda::GpuMat(), -1, l_strm);
-        }
-
-        // Allocate new disparity image message
-        disp_msg_.reset(new stereo_msgs::DisparityImage());
-        disp_msg_->header       = l_info_msg->header;
-        disp_msg_->image.header = l_info_msg->header;
-
-        // Compute window of (potentially) valid disparities
-        int border                       = block_matcher_->getBlockSize() / 2;
-        int left                         = block_matcher_->getNumDisparities() + block_matcher_min_disparity_ + border - 1;
-        int wtf                          = (block_matcher_min_disparity_ >= 0) ? border + block_matcher_min_disparity_ : std::max(border, -block_matcher_min_disparity_);
-        int right                        = disp_msg_->image.width - 1 - wtf;
-        int top                          = border;
-        int bottom                       = disp_msg_->image.height - 1 - border;
-        disp_msg_->valid_window.x_offset = left;
-        disp_msg_->valid_window.y_offset = top;
-        disp_msg_->valid_window.width    = right - left;
-        disp_msg_->valid_window.height   = bottom - top;
-        disp_msg_->min_disparity         = block_matcher_min_disparity_ + 1;
-        disp_msg_->max_disparity         = block_matcher_min_disparity_ + block_matcher_->getNumDisparities() - 1;
-
-        disp_msg_->image.height   = l_rect_mono.rows;
-        disp_msg_->image.width    = l_rect_mono.cols;
-        disp_msg_->image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-        disp_msg_->image.step     = l_rect_mono.cols * sizeof(float);
-        disp_msg_->image.data.resize(disp_msg_->image.step * disp_msg_->image.height);
-        disp_msg_data_ = cv::Mat_<float>(disp_msg_->image.height, disp_msg_->image.width, (float *)&disp_msg_->image.data[0], disp_msg_->image.step);
-        cv::cuda::registerPageLocked(disp_msg_data_);
-
-        disparity_float.download(disp_msg_data_, l_strm);
-
-        l_strm.enqueueHostCallback(
-            [](int status, void *userData) {
-                (void)status;
-                static_cast<StereoprocNodelet *>(userData)->sendDisparity();
-            },
-            (void *)this);
+        stereoProcessor_->enqueueSendDisparity(l_raw_msg, pub_disparity_);
     }
 
     if (connected_.DisparityVis)

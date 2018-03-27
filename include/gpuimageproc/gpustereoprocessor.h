@@ -8,31 +8,32 @@
 #include <opencv2/cudawarping.hpp>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
+#include <stereo_msgs/DisparityImage.h>
 
 namespace gpuimageproc
 {
 
 enum GpuMatSource
 {
-    GPU_MAT_SIDE_L    = 0,
-    GPU_MAT_SIDE_R    = 1,
+    GPU_MAT_SIDE_L = 0,
+    GPU_MAT_SIDE_R = 1,
     GPU_MAT_SIDE_MASK = GPU_MAT_SIDE_L | GPU_MAT_SIDE_R,
 
-    GPU_MAT_SRC_RAW        = 1 << 1,
-    GPU_MAT_SRC_MONO       = 1 << 2,
-    GPU_MAT_SRC_COLOR      = 1 << 3,
-    GPU_MAT_SRC_RECT_MONO  = 1 << 4,
+    GPU_MAT_SRC_RAW = 1 << 1,
+    GPU_MAT_SRC_MONO = 1 << 2,
+    GPU_MAT_SRC_COLOR = 1 << 3,
+    GPU_MAT_SRC_RECT_MONO = 1 << 4,
     GPU_MAT_SRC_RECT_COLOR = 1 << 5,
-    GPU_MAT_SRC_MASK       = GPU_MAT_SRC_RAW | GPU_MAT_SRC_MONO | GPU_MAT_SRC_COLOR | GPU_MAT_SRC_RECT_MONO | GPU_MAT_SRC_RECT_COLOR,
+    GPU_MAT_SRC_MASK = GPU_MAT_SRC_RAW | GPU_MAT_SRC_MONO | GPU_MAT_SRC_COLOR | GPU_MAT_SRC_RECT_MONO | GPU_MAT_SRC_RECT_COLOR,
 
-    GPU_MAT_SRC_L_RAW        = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_L,
-    GPU_MAT_SRC_R_RAW        = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_R,
-    GPU_MAT_SRC_L_MONO       = GPU_MAT_SRC_MONO | GPU_MAT_SIDE_L,
-    GPU_MAT_SRC_R_MONO       = GPU_MAT_SRC_MONO | GPU_MAT_SIDE_R,
-    GPU_MAT_SRC_L_COLOR      = GPU_MAT_SRC_COLOR | GPU_MAT_SIDE_L,
-    GPU_MAT_SRC_R_COLOR      = GPU_MAT_SRC_COLOR | GPU_MAT_SIDE_R,
-    GPU_MAT_SRC_L_RECT_MONO  = GPU_MAT_SRC_RECT_MONO | GPU_MAT_SIDE_L,
-    GPU_MAT_SRC_R_RECT_MONO  = GPU_MAT_SRC_RECT_MONO | GPU_MAT_SIDE_R,
+    GPU_MAT_SRC_L_RAW = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_L,
+    GPU_MAT_SRC_R_RAW = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_R,
+    GPU_MAT_SRC_L_MONO = GPU_MAT_SRC_MONO | GPU_MAT_SIDE_L,
+    GPU_MAT_SRC_R_MONO = GPU_MAT_SRC_MONO | GPU_MAT_SIDE_R,
+    GPU_MAT_SRC_L_COLOR = GPU_MAT_SRC_COLOR | GPU_MAT_SIDE_L,
+    GPU_MAT_SRC_R_COLOR = GPU_MAT_SRC_COLOR | GPU_MAT_SIDE_R,
+    GPU_MAT_SRC_L_RECT_MONO = GPU_MAT_SRC_RECT_MONO | GPU_MAT_SIDE_L,
+    GPU_MAT_SRC_R_RECT_MONO = GPU_MAT_SRC_RECT_MONO | GPU_MAT_SIDE_R,
     GPU_MAT_SRC_L_RECT_COLOR = GPU_MAT_SRC_RECT_COLOR | GPU_MAT_SIDE_L,
     GPU_MAT_SRC_R_RECT_COLOR = GPU_MAT_SRC_RECT_COLOR | GPU_MAT_SIDE_R
 };
@@ -46,8 +47,10 @@ class GpuStereoProcessor
     void initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg);
     void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher &pub);
+    void enqueueSendDisparity(const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher &pub);
     void colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
+    void computeDisparity();
 
   protected:
     cv::cuda::GpuMat &getGpuMat(GpuMatSource source);
@@ -60,6 +63,11 @@ class GpuStereoProcessor
     cv::cuda::GpuMat l_color, r_color;
     cv::cuda::GpuMat l_rect_mono, r_rect_mono;
     cv::cuda::GpuMat l_rect_color, r_rect_color;
+    cv::cuda::GpuMat disparity, disparity_32F;
+
+    stereo_msgs::DisparityImagePtr disp_msg_;
+    ros::Publisher &pub_disparity_;
+    void sendDisparity(void) { pub_disparity_.publish(disp_msg_); }
 
     cv::cuda::HostMem filter_buf_;
 
