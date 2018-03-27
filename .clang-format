@@ -1,0 +1,11 @@
+BasedOnStyle: LLVM
+Standard: Cpp03
+IndentWidth: 4
+UseTab: Never
+BreakBeforeBraces: Linux
+AllowShortIfStatementsOnASingleLine: false
+AlignConsecutiveAssignments: true
+IndentCaseLabels: false
+BreakBeforeBraces: Allman
+BreakConstructorInitializersBeforeComma: true
+ColumnLimit: 180

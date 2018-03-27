@@ -1,3 +1,4 @@
+#pragma once
 #include <boost/thread/lock_guard.hpp>
 
 #include <opencv2/opencv.hpp>
@@ -16,12 +17,13 @@
 #include <stereo_msgs/DisparityImage.h>
 #include <opencv2/cudastereo.hpp>
 
+#include "gpuimageproc/gpustereoprocessor.h"
 #include "gpuimageproc/GPUConfig.h"
 #include "gpuimageproc/connectedtopics.h"
 
 namespace gpuimageproc
 {
-class Stereoproc : public nodelet::Nodelet
+class StereoprocNodelet : public nodelet::Nodelet
 {
   boost::shared_ptr<image_transport::ImageTransport> it_;
   
@@ -55,6 +57,7 @@ class Stereoproc : public nodelet::Nodelet
   stereo_msgs::DisparityImagePtr disp_msg_;
   cv::Mat_<float> disp_msg_data_;
   cv::cuda::HostMem filter_buf_;
+  boost::shared_ptr<GpuStereoProcessor> stereoProcessor_;
 
   // Dynamic reconfigure
   boost::recursive_mutex config_mutex_;

@@ -21,6 +21,7 @@ find_package(OpenCV
     PATHS /usr/local_ros
     NO_DEFAULT_PATH 
     REQUIRED)
+message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -100,7 +101,8 @@ include_directories(
 
 ## Declare a cpp library
 add_library(gpuimageproc
-  src/stereoproc.cpp
+    src/gpustereoprocessor.cpp
+    src/stereoproc.cpp
 )
 target_link_libraries(gpuimageproc ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
@@ -183,8 +185,9 @@ install(DIRECTORY
 #Add all files in subdirectories of the project in
 # a dummy_target so qtcreator have access to all files
 FILE(GLOB_RECURSE extra_files
-#    ${CMAKE_SOURCE_DIR}/*)
+#    ${CMAKE_SOURCE_DIR}/*
 ${CMAKE_SOURCE_DIR}/launch/*
+${CMAKE_SOURCE_DIR}/plugins/*
 ${CMAKE_SOURCE_DIR}/cfg/*
 )
 add_custom_target(dummy_${PROJECT_NAME} SOURCES ${extra_files})
