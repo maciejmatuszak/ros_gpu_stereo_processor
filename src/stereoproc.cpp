@@ -118,9 +118,9 @@ void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, con
     int level = connected_.level();
     NODELET_DEBUG("got images, level %d", level);
 
+    // TODO depend on timing there are potentially senders that did not completed yet...
+    stereoProcessor_->cleanSenders();
     stereoProcessor_->initStereoModel(l_info_msg, r_info_msg);
-
-    std::vector<GPUSender::Ptr> senders;
 
     // Create cv::Mat views onto all buffers
     const cv::Mat l_cpu_raw = cv_bridge::toCvShare(l_raw_msg, l_raw_msg->encoding)->image;
@@ -205,128 +205,19 @@ void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, con
 
     if (connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
-        stereoProcessor_->computeDisparity();
+        stereoProcessor_->computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
     }
 
     if (connected_.Disparity)
     {
-        stereoProcessor_->enqueueSendDisparity(l_raw_msg, pub_disparity_);
+        stereoProcessor_->enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY_32F, l_raw_msg, pub_disparity_);
     }
 
     if (connected_.DisparityVis)
     {
-        GPUSender::Ptr t(new GPUSender(l_raw_msg, sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_));
-        senders.push_back(t);
-        cv::cuda::GpuMat disparity_int(l_cpu_raw.size(), CV_16SC1);
-        cv::cuda::GpuMat disparity_image(l_cpu_raw.size(), CV_8UC4);
-        int ndisp = block_matcher_->getNumDisparities();
-        if (disparity.type() == CV_32F)
-        {
-            disparity.convertTo(disparity_int, CV_16SC1, 16, 0, l_strm);
-            ndisp *= 16;
-        }
-        else
-            disparity_int = disparity;
-        try
-        {
-            cv::cuda::drawColorDisp(disparity_int, disparity_image, ndisp, l_strm);
-            t->enqueueSend(disparity_image, l_strm);
-        }
-        catch (cv::Exception e)
-        {
-            NODELET_ERROR_STREAM("Unable to draw color disparity: " << e.err << "in " << e.file << ":" << e.func << " line " << e.line);
-        }
+        // TODO
     }
-
-    cv::cuda::GpuMat xyz;
-    if (connected_.Pointcloud)
-    {
-        model_.projectDisparityImageTo3dGPU(disparity, xyz, true, l_strm);
-        cv::cuda::HostMem cuda_xyz(l_cpu_raw.size(), CV_32FC3);
-        xyz.download(cuda_xyz, l_strm);
-        cv::Mat l_cpu_color(l_cpu_raw.size(), CV_8UC3);
-        l_color.download(l_cpu_color, l_strm);
-        sensor_msgs::PointCloud2Ptr points_msg = boost::make_shared<sensor_msgs::PointCloud2>();
-        points_msg->header                     = l_raw_msg->header;
-        points_msg->height                     = l_cpu_raw.rows;
-        points_msg->width                      = l_cpu_raw.cols;
-        points_msg->fields.resize(4);
-        points_msg->fields[0].name     = "x";
-        points_msg->fields[0].offset   = 0;
-        points_msg->fields[0].count    = 1;
-        points_msg->fields[0].datatype = sensor_msgs::PointField::FLOAT32;
-        points_msg->fields[1].name     = "y";
-        points_msg->fields[1].offset   = 4;
-        points_msg->fields[1].count    = 1;
-        points_msg->fields[1].datatype = sensor_msgs::PointField::FLOAT32;
-        points_msg->fields[2].name     = "z";
-        points_msg->fields[2].offset   = 8;
-        points_msg->fields[2].count    = 1;
-        points_msg->fields[2].datatype = sensor_msgs::PointField::FLOAT32;
-        points_msg->fields[3].name     = "rgb";
-        points_msg->fields[3].offset   = 12;
-        points_msg->fields[3].count    = 1;
-        points_msg->fields[3].datatype = sensor_msgs::PointField::FLOAT32;
-        // points_msg->is_bigendian = false; ???
-        static const int STEP  = 16;
-        points_msg->point_step = STEP;
-        points_msg->row_step   = points_msg->point_step * points_msg->width;
-        points_msg->data.resize(points_msg->row_step * points_msg->height);
-        points_msg->is_dense = false; // there may be invalid points
-
-        l_strm.waitForCompletion();
-        cv::Mat_<cv::Vec3f> cpu_xyz = cuda_xyz.createMatHeader();
-        float bad_point             = std::numeric_limits<float>::quiet_NaN();
-        int offset                  = 0;
-        for (int v = 0; v < cpu_xyz.rows; ++v)
-        {
-            for (int u = 0; u < cpu_xyz.cols; ++u, offset += STEP)
-            {
-                if (isValidPoint(cpu_xyz(v, u)))
-                {
-                    // x,y,z,rgba
-                    memcpy(&points_msg->data[offset + 0], &cpu_xyz(v, u)[0], sizeof(float));
-                    memcpy(&points_msg->data[offset + 4], &cpu_xyz(v, u)[1], sizeof(float));
-                    memcpy(&points_msg->data[offset + 8], &cpu_xyz(v, u)[2], sizeof(float));
-                }
-                else
-                {
-                    memcpy(&points_msg->data[offset + 0], &bad_point, sizeof(float));
-                    memcpy(&points_msg->data[offset + 4], &bad_point, sizeof(float));
-                    memcpy(&points_msg->data[offset + 8], &bad_point, sizeof(float));
-                }
-            }
-        }
-
-        // Fill in color
-        offset = 0;
-        const cv::Mat_<cv::Vec3b> color(l_cpu_color);
-        for (int v = 0; v < cpu_xyz.rows; ++v)
-        {
-            for (int u = 0; u < cpu_xyz.cols; ++u, offset += STEP)
-            {
-                if (isValidPoint(cpu_xyz(v, u)))
-                {
-                    const cv::Vec3b &bgr = color(v, u);
-                    int32_t rgb_packed   = (bgr[2] << 16) | (bgr[1] << 8) | bgr[0];
-                    memcpy(&points_msg->data[offset + 12], &rgb_packed, sizeof(int32_t));
-                }
-                else
-                {
-                    memcpy(&points_msg->data[offset + 12], &bad_point, sizeof(float));
-                }
-            }
-        }
-
-        pub_pointcloud_.publish(points_msg);
-    }
-
-    l_strm.waitForCompletion();
-    r_strm.waitForCompletion();
-    if (connected_.Disparity)
-        cv::cuda::unregisterPageLocked(disp_msg_data_);
-    // if(connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
-    //    cv::cuda::unregisterPageLocked(filter_buf_);
+    stereoProcessor_->waitForAllStreams();
     cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(l_cpu_raw));
     cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(r_cpu_raw));
 }
@@ -339,31 +230,27 @@ void StereoprocNodelet::configCb(Config &config, uint32_t level)
     config.correlation_window_size |= 0x1;                       // must be odd
     config.disparity_range = (config.disparity_range / 16) * 16; // must be multiple of 16
 
-    if (block_matcher_.empty())
-        block_matcher_ = cv::cuda::createStereoBM(config.disparity_range, config.correlation_window_size);
-    // Note: With single-threaded NodeHandle, configCb and imageCb can't be called
-    // concurrently, so this is thread-safe.Q
-    block_matcher_->setPreFilterType(config.xsobel ? cv::cuda::StereoBM::PREFILTER_XSOBEL : cv::cuda::StereoBM::PREFILTER_NORMALIZED_RESPONSE);
-    block_matcher_->setRefineDisparity(config.refine_disparity);
-    block_matcher_->setBlockSize(config.correlation_window_size);
-    block_matcher_->setNumDisparities(config.disparity_range);
-    block_matcher_->setTextureThreshold(config.texture_threshold);
+    stereoProcessor_->setPreFilterType(config.xsobel ? cv::cuda::StereoBM::PREFILTER_XSOBEL : cv::cuda::StereoBM::PREFILTER_NORMALIZED_RESPONSE);
+    stereoProcessor_->setRefineDisparity(config.refine_disparity);
+    stereoProcessor_->setBlockSize(config.correlation_window_size);
+    stereoProcessor_->setNumDisparities(config.disparity_range);
+    stereoProcessor_->setTextureThreshold(config.texture_threshold);
     NODELET_INFO("Reconfigure winsz:%d ndisp:%d tex:%3.1f", config.correlation_window_size, config.disparity_range, config.texture_threshold);
 
-    if (bilateral_filter_.empty())
-    {
-        bilateral_filter_ = cv::cuda::createDisparityBilateralFilter(config.filter_ndisp, config.filter_radius, config.filter_iters);
-    }
-    bilateral_filter_->setNumDisparities(config.filter_ndisp);
-    bilateral_filter_->setRadius(config.filter_radius);
-    bilateral_filter_->setNumIters(config.filter_iters);
+//    if (bilateral_filter_.empty())
+//    {
+//        bilateral_filter_ = cv::cuda::createDisparityBilateralFilter(config.filter_ndisp, config.filter_radius, config.filter_iters);
+//    }
+//    bilateral_filter_->setNumDisparities(config.filter_ndisp);
+//    bilateral_filter_->setRadius(config.filter_radius);
+//    bilateral_filter_->setNumIters(config.filter_iters);
 
-    bilateral_filter_->setEdgeThreshold(config.filter_edge_threshold);
-    bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
-    bilateral_filter_->setSigmaRange(config.filter_sigma_range);
-    bilateral_filter_enabled_ = config.bilateral_filter;
-    maxDiff_                  = config.max_diff;
-    maxSpeckleSize_           = config.max_speckle_size;
+//    bilateral_filter_->setEdgeThreshold(config.filter_edge_threshold);
+//    bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
+//    bilateral_filter_->setSigmaRange(config.filter_sigma_range);
+//    bilateral_filter_enabled_ = config.bilateral_filter;
+//    maxDiff_                  = config.max_diff;
+//    maxSpeckleSize_           = config.max_speckle_size;
 }
 
 } // namespace stereo_image_proc
