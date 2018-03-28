@@ -100,13 +100,14 @@ include_directories(
 )
 
 ## Declare a cpp library
-add_library(gpuimageproc
+add_library(${PROJECT_NAME}
     src/gpustereoprocessor.cpp
     src/stereoproc.cpp
 )
-target_link_libraries(gpuimageproc ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_dependencies(gpuimageproc ${PROJECT_NAME}_gencfg)
+add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
+
 
 ###################################
 ## catkin specific configuration ##
@@ -119,7 +120,7 @@ add_dependencies(gpuimageproc ${PROJECT_NAME}_gencfg)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES gpuimageproc
+  LIBRARIES ${PROJECT_NAME}
   CATKIN_DEPENDS nodelet sensor_msgs
   DEPENDS OpenCV
 )
@@ -151,7 +152,7 @@ catkin_package(
 # )
 
 ## Mark executables and/or libraries for installation
-install(TARGETS gpuimageproc
+install(TARGETS ${PROJECT_NAME}
    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
    RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -172,14 +173,11 @@ install(DIRECTORY
 ## Testing ##
 #############
 
-## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_gpuimageproc.cpp)
-# if(TARGET ${PROJECT_NAME}-test)
-#   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
-# endif()
+# add tests
+if(CATKIN_ENABLE_TESTING)
+    add_subdirectory(test)
+endif()
 
-## Add folders to be run by python nosetests
-# catkin_add_nosetests(test)
 
 ################################################
 #Add all files in subdirectories of the project in
@@ -189,6 +187,8 @@ FILE(GLOB_RECURSE extra_files
 ${CMAKE_SOURCE_DIR}/launch/*
 ${CMAKE_SOURCE_DIR}/plugins/*
 ${CMAKE_SOURCE_DIR}/cfg/*
+${CMAKE_SOURCE_DIR}/test/*
+${CMAKE_SOURCE_DIR}/*
 )
 add_custom_target(dummy_${PROJECT_NAME} SOURCES ${extra_files})
 ################################################
