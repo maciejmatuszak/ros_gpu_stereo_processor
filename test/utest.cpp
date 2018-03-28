@@ -73,11 +73,27 @@ TEST_F(CudaStereoBMTf, HasAccessToData)
 TEST_F(CudaStereoBMTf, GpuTransfer)
 {
     stereo_processor_.uploadMat(GPU_MAT_SRC_L_RECT_MONO, left_image);
-
-
+    stereo_processor_.waitForStream(GPU_MAT_SRC_L_RECT_MONO);
+    cv::Mat left_image2;
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_RECT_MONO, left_image2);
+    int nz_cnt = cv::countNonZero(left_image != left_image2);
+    ASSERT_EQ(0, nz_cnt);
     // EXPECT_MAT_NEAR(disp_gold, disp, 0.0);
 }
 
+
+TEST_F(CudaStereoBMTf, GpuDisparity)
+{
+    stereo_processor_.uploadMat(GPU_MAT_SRC_L_RECT_MONO, left_image);
+    stereo_processor_.uploadMat(GPU_MAT_SRC_R_RECT_MONO, right_image);
+    stereo_processor_.computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
+    stereo_processor_.waitForStream(GPU_MAT_SRC_L_RECT_MONO);
+    cv::Mat disparity_img;
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, disparity_img);
+    int nz_cnt = cv::countNonZero(disparity_img != disp_gold);
+    ASSERT_EQ(0, nz_cnt);
+    // EXPECT_MAT_NEAR(disp_gold, disp, 0.0);
+}
 
 
 int main(int argc, char **argv)
