@@ -52,6 +52,7 @@ class GpuStereoProcessor
     GpuStereoProcessor();
 
     void initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg);
+    void initStereoModel(const std::string& left_cal_file, const std::string& right_cal_file);
     void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher &pub);
@@ -82,6 +83,7 @@ class GpuStereoProcessor
 
     cv::Ptr<cv::cuda::StereoBM> block_matcher_;
     cv::Ptr<cv::cuda::DisparityBilateralFilter> bilateral_filter_;
+    std::string l_cam_name_, r_cam_name;
 
     bool bilateral_filter_enabled_;
     int maxSpeckleSize_;

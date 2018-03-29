@@ -15,4 +15,4 @@ add_executable(${PROJECT_NAME}-gtest utest.cpp)
 target_link_libraries(${PROJECT_NAME}-gtest ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME}-gtest ${PROJECT_NAME})
 
-#add_test(test_one  ${PROJECT_NAME}-gtest "${CMAKE_CURRENT_LIST_DIR}/data/input.file")
+add_test(test_one  ${PROJECT_NAME}-gtest "/data/git/temp_ws/src/gpuimageproc/test")

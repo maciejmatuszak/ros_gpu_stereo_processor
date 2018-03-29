@@ -1,9 +1,11 @@
 #include "gpuimageproc/gpustereoprocessor.h"
+#include <camera_calibration_parsers/parse.h>
 
 namespace gpuimageproc
 {
 
-GpuStereoProcessor::GpuStereoProcessor() {
+GpuStereoProcessor::GpuStereoProcessor()
+{
     cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
     block_matcher_ = cv::cuda::createStereoBM(128, 19);
 }
@@ -11,7 +13,17 @@ GpuStereoProcessor::GpuStereoProcessor() {
 void GpuStereoProcessor::initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg)
 {
     // Update the camera model
+    l_cam_name_ = "left";
+    l_cam_name_ = "right";
     model_.fromCameraInfo(l_info_msg, r_info_msg);
+}
+
+void GpuStereoProcessor::initStereoModel(const std::string& left_cal_file, const std::string& right_cal_file)
+{
+    sensor_msgs::CameraInfo l_info, r_info;
+    camera_calibration_parsers::readCalibration(left_cal_file, l_cam_name_, l_info);
+    camera_calibration_parsers::readCalibration(right_cal_file, r_cam_name, r_info);
+    model_.fromCameraInfo(l_info, r_info);
 }
 
 void GpuStereoProcessor::uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat)
@@ -109,10 +121,7 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
 }
 
-void GpuStereoProcessor::waitForStream(GpuMatSource stream_source)
-{
-    getStream(stream_source).waitForCompletion();
-}
+void GpuStereoProcessor::waitForStream(GpuMatSource stream_source) { getStream(stream_source).waitForCompletion(); }
 
 void GpuStereoProcessor::waitForAllStreams()
 {

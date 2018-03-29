@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_geometry
   cv_bridge
   image_transport
+  camera_calibration_parsers
 )
 
 ## System dependencies are found with CMake's conventions
