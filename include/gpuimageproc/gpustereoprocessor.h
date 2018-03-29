@@ -16,17 +16,17 @@ namespace gpuimageproc
 
 enum GpuMatSource
 {
-    GPU_MAT_SIDE_L    = 0,
-    GPU_MAT_SIDE_R    = 1,
+    GPU_MAT_SIDE_L    = 1 << 0,
+    GPU_MAT_SIDE_R    = 1 << 1,
     GPU_MAT_SIDE_MASK = GPU_MAT_SIDE_L | GPU_MAT_SIDE_R,
 
-    GPU_MAT_SRC_RAW           = 1 << 1,
-    GPU_MAT_SRC_MONO          = 1 << 2,
-    GPU_MAT_SRC_COLOR         = 1 << 3,
-    GPU_MAT_SRC_RECT_MONO     = 1 << 4,
-    GPU_MAT_SRC_RECT_COLOR    = 1 << 5,
-    GPU_MAT_SRC_DISPARITY     = 1 << 6,
-    GPU_MAT_SRC_DISPARITY_32F = 1 << 7,
+    GPU_MAT_SRC_RAW           = 1 << 2,
+    GPU_MAT_SRC_MONO          = 1 << 3,
+    GPU_MAT_SRC_COLOR         = 1 << 4,
+    GPU_MAT_SRC_RECT_MONO     = 1 << 5,
+    GPU_MAT_SRC_RECT_COLOR    = 1 << 6,
+    GPU_MAT_SRC_DISPARITY     = 1 << 7,
+    GPU_MAT_SRC_DISPARITY_32F = 1 << 8,
     GPU_MAT_SRC_MASK = GPU_MAT_SRC_RAW | GPU_MAT_SRC_MONO | GPU_MAT_SRC_COLOR | GPU_MAT_SRC_RECT_MONO | GPU_MAT_SRC_RECT_COLOR | GPU_MAT_SRC_DISPARITY | GPU_MAT_SRC_DISPARITY_32F,
 
     GPU_MAT_SRC_L_RAW           = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_L,
@@ -59,6 +59,8 @@ class GpuStereoProcessor
     void enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher &pub);
     void colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
+    void rectifyImageLeft(const cv::Mat& source, cv::Mat& dest, cv::InterpolationFlags interpolation);
+    void rectifyImageRight(const cv::Mat& source, cv::Mat& dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
     void waitForStream(GpuMatSource stream_source);
     void waitForAllStreams();

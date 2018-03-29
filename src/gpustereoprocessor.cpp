@@ -60,10 +60,12 @@ cv::cuda::Stream &GpuStereoProcessor::getStream(GpuMatSource source)
 {
     if ((source & GPU_MAT_SIDE_L) == GPU_MAT_SIDE_L)
     {
+        ROS_INFO("getStream L");
         return l_strm;
     }
     else // if(source & GPU_MAT_SRC_MASK_R == GPU_MAT_SRC_MASK_R)
     {
+        ROS_INFO("getStream R");
         return r_strm;
     }
 }
@@ -91,12 +93,34 @@ void GpuStereoProcessor::rectifyImage(GpuMatSource source, GpuMatSource dest, cv
 {
     if ((source & GPU_MAT_SIDE_L) == GPU_MAT_SIDE_L)
     {
-        model_.left().rectifyImageGPU(*getGpuMat(source), *getGpuMat(dest), interpolation, getStream(source));
+        ROS_INFO("rectifyImage L");
+        model_.left()
+                .rectifyImageGPU(
+                    *getGpuMat(source),
+                    *getGpuMat(dest),
+                    interpolation,
+                    getStream(source));
     }
     else
     {
-        model_.right().rectifyImageGPU(*getGpuMat(source), *getGpuMat(dest), interpolation, getStream(source));
+        ROS_INFO("rectifyImage R");
+        model_.right()
+                .rectifyImageGPU(
+                    *getGpuMat(source),
+                    *getGpuMat(dest),
+                    interpolation,
+                    getStream(source));
     }
+}
+
+void GpuStereoProcessor::rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation)
+{
+        model_.left().rectifyImage(source, dest, interpolation);
+}
+
+void GpuStereoProcessor::rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation)
+{
+        model_.right().rectifyImage(source, dest, interpolation);
 }
 
 void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity)
