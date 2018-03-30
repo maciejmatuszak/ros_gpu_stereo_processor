@@ -168,9 +168,11 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     // Create cv::Mat views onto all buffers
     const cv::Mat l_cpu_raw = cv_bridge::toCvShare(l_raw_msg, l_raw_msg->encoding)->image;
     cv::cuda::registerPageLocked(const_cast<cv::Mat &>(l_cpu_raw));
-    const cv::Mat r_cpu_raw = cv_bridge::toCvShare(r_raw_msg, l_raw_msg->encoding)->image;
+    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_L_RAW, l_cpu_raw);
+
+    const cv::Mat r_cpu_raw = cv_bridge::toCvShare(r_raw_msg, r_raw_msg->encoding)->image;
     cv::cuda::registerPageLocked(const_cast<cv::Mat &>(r_cpu_raw));
-    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_L_RAW, r_cpu_raw);
+    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_R_RAW, r_cpu_raw);
 
     if (connected_.DebayerMonoLeft || connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {

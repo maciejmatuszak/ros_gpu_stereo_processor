@@ -55,7 +55,7 @@ class GPUSender
         disp_msg_->image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
         disp_msg_->image.step     = example->width * sizeof(float);
         disp_msg_->image.data.resize(disp_msg_->image.step * disp_msg_->image.height);
-        cv::Mat_<float> cpu_data_ = cv::Mat_<float>(disp_msg_->image.height, disp_msg_->image.width, (float *)&disp_msg_->image.data[0], disp_msg_->image.step);
+        cpu_data_ = cv::Mat_<float>(disp_msg_->image.height, disp_msg_->image.width, (float *)&disp_msg_->image.data[0], disp_msg_->image.step);
         cv::cuda::registerPageLocked(cpu_data_);
     }
 
@@ -63,11 +63,11 @@ class GPUSender
 
     void send(void)
     {
-        if (!image_msg_)
+        if (image_msg_)
         {
             publisher_.publish(image_msg_);
         }
-        if (!disp_msg_)
+        if (disp_msg_)
         {
             publisher_.publish(disp_msg_);
         }
