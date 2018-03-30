@@ -12,13 +12,13 @@
 namespace gpuimageproc
 {
 
-void StereoprocNodelet::onInit()
+StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
+    : nh(nh)
+    , private_nh(private_nh)
 {
-    ros::NodeHandle &nh         = getNodeHandle();
-    ros::NodeHandle &private_nh = getPrivateNodeHandle();
-    stereoProcessor_            = boost::make_shared<GpuStereoProcessor>();
-    camera_info_file_left_      = "";
-    camera_info_file_right_     = "";
+    stereoProcessor_        = boost::make_shared<GpuStereoProcessor>();
+    camera_info_file_left_  = "";
+    camera_info_file_right_ = "";
 
     it_.reset(new image_transport::ImageTransport(nh));
 
@@ -32,10 +32,10 @@ void StereoprocNodelet::onInit()
     private_nh.param<std::string>("camera_info_file_left", camera_info_file_left_, camera_info_file_left_);
     private_nh.param<std::string>("camera_info_file_right", camera_info_file_right_, camera_info_file_right_);
 
-    NODELET_INFO("PARAM: camera_info_file_left:%s", camera_info_file_left_.c_str());
-    NODELET_INFO("PARAM: camera_info_file_right:%s", camera_info_file_right_.c_str());
-    NODELET_INFO("PARAM: queue_size:%d", queue_size);
-    NODELET_INFO("PARAM: approximate_sync:%s", approx ? "true" : "false");
+    ROS_INFO("PARAM: camera_info_file_left:%s", camera_info_file_left_.c_str());
+    ROS_INFO("PARAM: camera_info_file_right:%s", camera_info_file_right_.c_str());
+    ROS_INFO("PARAM: queue_size:%d", queue_size);
+    ROS_INFO("PARAM: approximate_sync:%s", approx ? "true" : "false");
 
     if (!camera_info_file_left_.empty() || !camera_info_file_right_.empty())
     {
@@ -47,12 +47,13 @@ void StereoprocNodelet::onInit()
         if (camera_info_from_files_)
         {
             approximate_sync_images_.reset(new ApproximateSyncImages(ApproximatePolicyImages(queue_size), sub_l_raw_image_, sub_r_raw_image_));
-            approximate_sync_images_->registerCallback(boost::bind(&StereoprocNodelet::imageCb, this, _1, _2));
+            approximate_sync_images_->registerCallback(boost::bind(&StereoProcessor::imageCb, this, _1, _2));
         }
         else
         {
-            approximate_sync_images_and_info_.reset(new ApproximateSyncImagesAndInfo(ApproximatePolicyImagesAndInfo(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
-            approximate_sync_images_and_info_->registerCallback(boost::bind(&StereoprocNodelet::imageAndInfoCb, this, _1, _2, _3, _4));
+            approximate_sync_images_and_info_.reset(
+                new ApproximateSyncImagesAndInfo(ApproximatePolicyImagesAndInfo(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
+            approximate_sync_images_and_info_->registerCallback(boost::bind(&StereoProcessor::imageAndInfoCb, this, _1, _2, _3, _4));
         }
     }
     else
@@ -60,22 +61,22 @@ void StereoprocNodelet::onInit()
         if (camera_info_from_files_)
         {
             exact_sync_images_.reset(new ExactSyncImages(ExactPolicyImages(queue_size), sub_l_raw_image_, sub_r_raw_image_));
-            exact_sync_images_->registerCallback(boost::bind(&StereoprocNodelet::imageCb, this, _1, _2));
+            exact_sync_images_->registerCallback(boost::bind(&StereoProcessor::imageCb, this, _1, _2));
         }
         else
         {
             exact_sync_images_and_info_.reset(new ExactSyncImagesAndInfo(ExactPolicyImagesAndInfo(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
-            exact_sync_images_and_info_->registerCallback(boost::bind(&StereoprocNodelet::imageAndInfoCb, this, _1, _2, _3, _4));
+            exact_sync_images_and_info_->registerCallback(boost::bind(&StereoProcessor::imageAndInfoCb, this, _1, _2, _3, _4));
         }
     }
 
     // Set up dynamic reconfiguration
-    ReconfigureServer::CallbackType f = boost::bind(&StereoprocNodelet::configCb, this, _1, _2);
+    ReconfigureServer::CallbackType f = boost::bind(&StereoProcessor::configCb, this, _1, _2);
     reconfigure_server_.reset(new ReconfigureServer(config_mutex_, private_nh));
     reconfigure_server_->setCallback(f);
 
     // Monitor whether anyone is subscribed to the output
-    ros::SubscriberStatusCallback connect_cb = boost::bind(&StereoprocNodelet::connectCb, this);
+    ros::SubscriberStatusCallback connect_cb = boost::bind(&StereoProcessor::connectCb, this);
     // Make sure we don't enter connectCb() between advertising and assigning to pub_disparity_
     boost::lock_guard<boost::mutex> lock(connect_mutex_);
     int publisher_queue_size;
@@ -94,7 +95,7 @@ void StereoprocNodelet::onInit()
 }
 
 // Handles (un)subscribing when clients (un)subscribe
-void StereoprocNodelet::connectCb()
+void StereoProcessor::connectCb()
 {
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
     connected_.DebayerMonoLeft   = (pub_mono_left_.getNumSubscribers() > 0) ? 1 : 0;
@@ -111,7 +112,7 @@ void StereoprocNodelet::connectCb()
     int level                    = connected_.level();
     if (level == 0)
     {
-        NODELET_INFO("Un-subscribing from images and camera infos");
+        ROS_INFO("Un-subscribing from images and camera infos");
         sub_l_raw_image_.unsubscribe();
         sub_l_info_.unsubscribe();
         sub_r_raw_image_.unsubscribe();
@@ -119,24 +120,23 @@ void StereoprocNodelet::connectCb()
     }
     else if (!sub_l_raw_image_.getSubscriber())
     {
-        ros::NodeHandle &nh = getNodeHandle();
         // Queue size 1 should be OK; the one that matters is the synchronizer queue size.
         /// @todo Allow remapping left, right?
-        image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
-        NODELET_INFO("Subscribing to raw images");
+        image_transport::TransportHints hints("raw", ros::TransportHints(), private_nh);
+        ROS_INFO("Subscribing to raw images");
         sub_l_raw_image_.subscribe(*it_, "left/image_raw", 1, hints);
         sub_r_raw_image_.subscribe(*it_, "right/image_raw", 1, hints);
         if (!camera_info_from_files_)
         {
-            NODELET_INFO("Subscribing to camera infos");
+            ROS_INFO("Subscribing to camera infos");
             sub_l_info_.subscribe(nh, "left/camera_info", 1);
             sub_r_info_.subscribe(nh, "right/camera_info", 1);
         }
     }
 }
 
-void StereoprocNodelet::imageAndInfoCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::ImageConstPtr &r_raw_msg,
-                                       const sensor_msgs::CameraInfoConstPtr &r_info_msg)
+void StereoProcessor::imageAndInfoCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::ImageConstPtr &r_raw_msg,
+                                     const sensor_msgs::CameraInfoConstPtr &r_info_msg)
 {
     if (!stereoProcessor_->isStereoModelInitialised())
     {
@@ -148,12 +148,12 @@ void StereoprocNodelet::imageAndInfoCb(const sensor_msgs::ImageConstPtr &l_raw_m
     imageCb(l_raw_msg, r_raw_msg);
 }
 
-void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::ImageConstPtr &r_raw_msg)
+void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::ImageConstPtr &r_raw_msg)
 {
     boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
     int level = connected_.level();
-    NODELET_DEBUG("got images, level %d", level);
+    ROS_DEBUG("got images, level %d", level);
 
     // TODO depend on timing there are potentially senders that did not completed yet...
     stereoProcessor_->cleanSenders();
@@ -272,15 +272,13 @@ inline bool isValidPoint(const cv::Vec3f &pt)
     return pt[2] != image_geometry::StereoCameraModel::MISSING_Z && !std::isinf(pt[2]);
 }
 
-void StereoprocNodelet::filterSpeckles(void)
+void StereoProcessor::filterSpeckles(void)
 {
     cv::Mat disp = filter_buf_.createMatHeader();
     cv::filterSpeckles(disp, 0, maxSpeckleSize_, maxDiff_ * 256);
 }
 
-void StereoprocNodelet::sendDisparity(void) { pub_disparity_.publish(disp_msg_); }
-
-void StereoprocNodelet::configCb(Config &config, uint32_t level)
+void StereoProcessor::configCb(Config &config, uint32_t level)
 {
     // Tweak all settings to be valid
     config.correlation_window_size |= 0x1;                       // must be odd
@@ -291,7 +289,7 @@ void StereoprocNodelet::configCb(Config &config, uint32_t level)
     stereoProcessor_->setBlockSize(config.correlation_window_size);
     stereoProcessor_->setNumDisparities(config.disparity_range);
     stereoProcessor_->setTextureThreshold(config.texture_threshold);
-    NODELET_INFO("Reconfigure winsz:%d ndisp:%d tex:%3.1f", config.correlation_window_size, config.disparity_range, config.texture_threshold);
+    ROS_INFO("Reconfigure winsz:%d ndisp:%d tex:%3.1f", config.correlation_window_size, config.disparity_range, config.texture_threshold);
 
     //    if (bilateral_filter_.empty())
     //    {
@@ -311,7 +309,4 @@ void StereoprocNodelet::configCb(Config &config, uint32_t level)
 
 } // namespace stereo_image_proc
 
-// Register nodelet
-#include <pluginlib/class_list_macros.h>
 
-PLUGINLIB_EXPORT_CLASS(gpuimageproc::StereoprocNodelet, nodelet::Nodelet)

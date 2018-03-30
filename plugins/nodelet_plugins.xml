@@ -1,5 +1,5 @@
 <library path="lib/libgpuimageproc">
-    <class name="gpuimageproc/Stereoproc" type="gpuimageproc::StereoprocNodelet" base_class_type="nodelet::Nodelet">
+    <class name="gpuimageproc/Stereoproc" type="gpuimageproc::StereoProcNodelet" base_class_type="nodelet::Nodelet">
         <description>
             Runs stereo image pipeline on GPU
         </description>

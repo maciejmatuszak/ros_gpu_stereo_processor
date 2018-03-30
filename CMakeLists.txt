@@ -104,11 +104,17 @@ include_directories(
 add_library(${PROJECT_NAME}
     src/gpustereoprocessor.cpp
     src/stereoproc.cpp
+    src/stereoprocnodelet.cpp
+
 )
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
+add_executable(${PROJECT_NAME}_node
+        src/stereo_proc_node.cpp
+        )
+target_link_libraries(${PROJECT_NAME}_node
+    ${PROJECT_NAME})
 
 ###################################
 ## catkin specific configuration ##

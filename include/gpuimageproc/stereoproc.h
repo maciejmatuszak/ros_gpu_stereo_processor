@@ -11,7 +11,6 @@
 #include <message_filters/sync_policies/approximate_time.h>
 #include <message_filters/sync_policies/exact_time.h>
 #include <message_filters/synchronizer.h>
-#include <nodelet/nodelet.h>
 #include <opencv2/cudastereo.hpp>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
@@ -23,8 +22,15 @@
 
 namespace gpuimageproc
 {
-class StereoprocNodelet : public nodelet::Nodelet
+class StereoProcessor
 {
+
+  public:
+    StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_nh);
+
+  protected:
+    ros::NodeHandle &nh;
+    ros::NodeHandle &private_nh;
     boost::shared_ptr<image_transport::ImageTransport> it_;
 
     // Subscriptions
@@ -35,7 +41,8 @@ class StereoprocNodelet : public nodelet::Nodelet
     typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::Image, sensor_msgs::CameraInfo> ExactPolicyImagesAndInfo;
 
     typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image> ApproximatePolicyImages;
-    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::Image, sensor_msgs::CameraInfo> ApproximatePolicyImagesAndInfo;
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::CameraInfo, sensor_msgs::Image, sensor_msgs::CameraInfo>
+        ApproximatePolicyImagesAndInfo;
 
     typedef message_filters::Synchronizer<ExactPolicyImages> ExactSyncImages;
     typedef message_filters::Synchronizer<ExactPolicyImagesAndInfo> ExactSyncImagesAndInfo;
@@ -94,14 +101,9 @@ class StereoprocNodelet : public nodelet::Nodelet
 
     void configCb(Config &config, uint32_t level);
 
-    void sendDisparity(void);
-
     void filterSpeckles(void);
     bool bilateral_filter_enabled_;
     int maxSpeckleSize_;
     double maxDiff_;
-
-  public:
-    virtual void onInit();
 };
 }
