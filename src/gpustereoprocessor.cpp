@@ -16,15 +16,19 @@ void GpuStereoProcessor::initStereoModel(const sensor_msgs::CameraInfoConstPtr &
     l_cam_name_ = "left";
     l_cam_name_ = "right";
     model_.fromCameraInfo(l_info_msg, r_info_msg);
+    ROS_INFO("camera model initialised from messages");
 }
 
-void GpuStereoProcessor::initStereoModel(const std::string& left_cal_file, const std::string& right_cal_file)
+void GpuStereoProcessor::initStereoModel(const std::string &left_cal_file, const std::string &right_cal_file)
 {
     sensor_msgs::CameraInfo l_info, r_info;
     camera_calibration_parsers::readCalibration(left_cal_file, l_cam_name_, l_info);
     camera_calibration_parsers::readCalibration(right_cal_file, r_cam_name, r_info);
     model_.fromCameraInfo(l_info, r_info);
+    ROS_INFO("camera model initialised from files");
 }
+
+bool GpuStereoProcessor::isStereoModelInitialised() { return model_.initialized(); }
 
 void GpuStereoProcessor::uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat)
 {
@@ -46,7 +50,7 @@ boost::shared_ptr<cv::cuda::GpuMat> GpuStereoProcessor::getGpuMat(GpuMatSource s
     auto str_source = std::to_string(source);
     if (gpu_mats.find(str_source) == gpu_mats.end())
     {
-        gpuMat = boost::make_shared<cv::cuda::GpuMat>();
+        gpuMat               = boost::make_shared<cv::cuda::GpuMat>();
         gpu_mats[str_source] = gpuMat;
         return gpu_mats[str_source];
     }
@@ -94,39 +98,23 @@ void GpuStereoProcessor::rectifyImage(GpuMatSource source, GpuMatSource dest, cv
     if ((source & GPU_MAT_SIDE_L) == GPU_MAT_SIDE_L)
     {
         ROS_INFO("rectifyImage L");
-        model_.left()
-                .rectifyImageGPU(
-                    *getGpuMat(source),
-                    *getGpuMat(dest),
-                    interpolation,
-                    getStream(source));
+        model_.left().rectifyImageGPU(*getGpuMat(source), *getGpuMat(dest), interpolation, getStream(source));
     }
     else
     {
         ROS_INFO("rectifyImage R");
-        model_.right()
-                .rectifyImageGPU(
-                    *getGpuMat(source),
-                    *getGpuMat(dest),
-                    interpolation,
-                    getStream(source));
+        model_.right().rectifyImageGPU(*getGpuMat(source), *getGpuMat(dest), interpolation, getStream(source));
     }
 }
 
-void GpuStereoProcessor::rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation)
-{
-        model_.left().rectifyImage(source, dest, interpolation);
-}
+void GpuStereoProcessor::rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation) { model_.left().rectifyImage(source, dest, interpolation); }
 
-void GpuStereoProcessor::rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation)
-{
-        model_.right().rectifyImage(source, dest, interpolation);
-}
+void GpuStereoProcessor::rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation) { model_.right().rectifyImage(source, dest, interpolation); }
 
 void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity)
 {
     // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
-    static const int DPP = 16; // disparities per pixel
+    static const int DPP        = 16; // disparities per pixel
     static const double inv_dpp = 1.0 / DPP;
 
     getStream(static_cast<GpuMatSource>(disparity ^ GPU_MAT_SIDE_MASK)).waitForCompletion();

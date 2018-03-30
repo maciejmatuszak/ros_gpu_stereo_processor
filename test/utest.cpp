@@ -152,8 +152,8 @@ class CudaStereoBMTf : public testing::Test
 
 TEST_F(CudaStereoBMTf, RectifyMonoGpu)
 {
-    loadImagesLab();
-    initStereoModelLab();
+    loadImagesEuroc();
+    initStereoModelEuroc_scale_0();
     stereo_processor_.uploadMat(GPU_MAT_SRC_L_RAW, l_raw_);
     stereo_processor_.uploadMat(GPU_MAT_SRC_R_RAW, r_raw_);
 

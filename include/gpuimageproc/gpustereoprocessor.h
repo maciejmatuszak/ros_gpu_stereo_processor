@@ -1,6 +1,5 @@
 #pragma once
 #include "gpuimageproc/gpu_sender.h"
-#include <unordered_map>
 #include <image_geometry/stereo_camera_model.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudaarithm.hpp>
@@ -10,6 +9,7 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
 #include <stereo_msgs/DisparityImage.h>
+#include <unordered_map>
 
 namespace gpuimageproc
 {
@@ -52,15 +52,16 @@ class GpuStereoProcessor
     GpuStereoProcessor();
 
     void initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg);
-    void initStereoModel(const std::string& left_cal_file, const std::string& right_cal_file);
+    void initStereoModel(const std::string &left_cal_file, const std::string &right_cal_file);
+    bool isStereoModelInitialised();
     void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher &pub);
     void enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher &pub);
     void colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
-    void rectifyImageLeft(const cv::Mat& source, cv::Mat& dest, cv::InterpolationFlags interpolation);
-    void rectifyImageRight(const cv::Mat& source, cv::Mat& dest, cv::InterpolationFlags interpolation);
+    void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
+    void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
     void waitForStream(GpuMatSource stream_source);
     void waitForAllStreams();

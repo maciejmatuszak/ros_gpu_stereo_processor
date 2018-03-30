@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <arg name="bagfile" default="/data/rosbag/mission_2018-03-08-16-58-51_rewrite.bag"/>
+    <arg name="bagfile" default="/home/maciej/Downloads/euroc_calib/cam_checkerboard.bag"/>
 
     <param name="use_sim_time2" type="bool" value="true"/>
 
@@ -10,11 +10,9 @@
         type="play"
         name="replay"
         args="--pause --clock --loop
-            --topics /loitor_stereo_visensor/left/image_raw
-                    /loitor_stereo_visensor/left/camera_info
-                    /loitor_stereo_visensor/right/image_raw
-                    /loitor_stereo_visensor/right/camera_info
-                    tf
+            --topics /cam0/image_raw
+                     /cam1/image_raw
+                     /tf
             --bags $(arg bagfile)"
         output="screen">
      </node>
@@ -37,9 +35,9 @@
         args="load gpuimageproc/Stereoproc manager"
         output="screen"
         >
-        <remap to="/loitor_stereo_visensor/left/image_raw"
+        <remap to="/cam0/image_raw"
                from="left/image_raw"/>
-        <remap to="/loitor_stereo_visensor/right/image_raw"
+        <remap to="/cam1/image_raw"
                from="right/image_raw"/>
         <remap to="/loitor_stereo_visensor/left/camera_info"
                from="left/camera_info"/>
@@ -47,5 +45,7 @@
                from="right/camera_info"/>
 
         <param name="approximate_sync" type="bool" value="false"/>
+        <param name="camera_info_file_left" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_left_scale_0.yaml"/>
+        <param name="camera_info_file_right" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_right_scale_0.yaml"/>
     </node>
 </launch>

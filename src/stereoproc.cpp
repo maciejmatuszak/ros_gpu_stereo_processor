@@ -17,6 +17,8 @@ void StereoprocNodelet::onInit()
     ros::NodeHandle &nh         = getNodeHandle();
     ros::NodeHandle &private_nh = getPrivateNodeHandle();
     stereoProcessor_            = boost::make_shared<GpuStereoProcessor>();
+    camera_info_file_left_      = "";
+    camera_info_file_right_     = "";
 
     it_.reset(new image_transport::ImageTransport(nh));
 
@@ -26,15 +28,45 @@ void StereoprocNodelet::onInit()
     private_nh.param("queue_size", queue_size, 5);
     bool approx;
     private_nh.param("approximate_sync", approx, false);
+
+    private_nh.param<std::string>("camera_info_file_left", camera_info_file_left_, camera_info_file_left_);
+    private_nh.param<std::string>("camera_info_file_right", camera_info_file_right_, camera_info_file_right_);
+
+    NODELET_INFO("PARAM: camera_info_file_left:%s", camera_info_file_left_.c_str());
+    NODELET_INFO("PARAM: camera_info_file_right:%s", camera_info_file_right_.c_str());
+    NODELET_INFO("PARAM: queue_size:%d", queue_size);
+    NODELET_INFO("PARAM: approximate_sync:%s", approx ? "true" : "false");
+
+    if (!camera_info_file_left_.empty() || !camera_info_file_right_.empty())
+    {
+        camera_info_from_files_ = true;
+    }
+
     if (approx)
     {
-        approximate_sync_.reset(new ApproximateSync(ApproximatePolicy(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
-        approximate_sync_->registerCallback(boost::bind(&StereoprocNodelet::imageCb, this, _1, _2, _3, _4));
+        if (camera_info_from_files_)
+        {
+            approximate_sync_images_.reset(new ApproximateSyncImages(ApproximatePolicyImages(queue_size), sub_l_raw_image_, sub_r_raw_image_));
+            approximate_sync_images_->registerCallback(boost::bind(&StereoprocNodelet::imageCb, this, _1, _2));
+        }
+        else
+        {
+            approximate_sync_images_and_info_.reset(new ApproximateSyncImagesAndInfo(ApproximatePolicyImagesAndInfo(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
+            approximate_sync_images_and_info_->registerCallback(boost::bind(&StereoprocNodelet::imageAndInfoCb, this, _1, _2, _3, _4));
+        }
     }
     else
     {
-        exact_sync_.reset(new ExactSync(ExactPolicy(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
-        exact_sync_->registerCallback(boost::bind(&StereoprocNodelet::imageCb, this, _1, _2, _3, _4));
+        if (camera_info_from_files_)
+        {
+            exact_sync_images_.reset(new ExactSyncImages(ExactPolicyImages(queue_size), sub_l_raw_image_, sub_r_raw_image_));
+            exact_sync_images_->registerCallback(boost::bind(&StereoprocNodelet::imageCb, this, _1, _2));
+        }
+        else
+        {
+            exact_sync_images_and_info_.reset(new ExactSyncImagesAndInfo(ExactPolicyImagesAndInfo(queue_size), sub_l_raw_image_, sub_l_info_, sub_r_raw_image_, sub_r_info_));
+            exact_sync_images_and_info_->registerCallback(boost::bind(&StereoprocNodelet::imageAndInfoCb, this, _1, _2, _3, _4));
+        }
     }
 
     // Set up dynamic reconfiguration
@@ -79,6 +111,7 @@ void StereoprocNodelet::connectCb()
     int level                    = connected_.level();
     if (level == 0)
     {
+        NODELET_INFO("Un-subscribing from images and camera infos");
         sub_l_raw_image_.unsubscribe();
         sub_l_info_.unsubscribe();
         sub_r_raw_image_.unsubscribe();
@@ -90,28 +123,32 @@ void StereoprocNodelet::connectCb()
         // Queue size 1 should be OK; the one that matters is the synchronizer queue size.
         /// @todo Allow remapping left, right?
         image_transport::TransportHints hints("raw", ros::TransportHints(), getPrivateNodeHandle());
+        NODELET_INFO("Subscribing to raw images");
         sub_l_raw_image_.subscribe(*it_, "left/image_raw", 1, hints);
-        sub_l_info_.subscribe(nh, "left/camera_info", 1);
         sub_r_raw_image_.subscribe(*it_, "right/image_raw", 1, hints);
-        sub_r_info_.subscribe(nh, "right/camera_info", 1);
+        if (!camera_info_from_files_)
+        {
+            NODELET_INFO("Subscribing to camera infos");
+            sub_l_info_.subscribe(nh, "left/camera_info", 1);
+            sub_r_info_.subscribe(nh, "right/camera_info", 1);
+        }
     }
 }
 
-inline bool isValidPoint(const cv::Vec3f &pt)
+void StereoprocNodelet::imageAndInfoCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::ImageConstPtr &r_raw_msg,
+                                       const sensor_msgs::CameraInfoConstPtr &r_info_msg)
 {
-    // Check both for disparities explicitly marked as invalid (where OpenCV maps pt.z to MISSING_Z)
-    // and zero disparities (point mapped to infinity).
-    return pt[2] != image_geometry::StereoCameraModel::MISSING_Z && !std::isinf(pt[2]);
+    if (!stereoProcessor_->isStereoModelInitialised())
+    {
+        if (!camera_info_from_files_)
+        {
+            stereoProcessor_->initStereoModel(l_info_msg, r_info_msg);
+        }
+    }
+    imageCb(l_raw_msg, r_raw_msg);
 }
 
-void StereoprocNodelet::filterSpeckles(void)
-{
-    cv::Mat disp = filter_buf_.createMatHeader();
-    cv::filterSpeckles(disp, 0, maxSpeckleSize_, maxDiff_ * 256);
-}
-
-void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::ImageConstPtr &r_raw_msg,
-                                const sensor_msgs::CameraInfoConstPtr &r_info_msg)
+void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::ImageConstPtr &r_raw_msg)
 {
     boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
@@ -120,7 +157,13 @@ void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, con
 
     // TODO depend on timing there are potentially senders that did not completed yet...
     stereoProcessor_->cleanSenders();
-    stereoProcessor_->initStereoModel(l_info_msg, r_info_msg);
+    if (!stereoProcessor_->isStereoModelInitialised())
+    {
+        if (camera_info_from_files_)
+        {
+            stereoProcessor_->initStereoModel(camera_info_file_left_, camera_info_file_right_);
+        }
+    }
 
     // Create cv::Mat views onto all buffers
     const cv::Mat l_cpu_raw = cv_bridge::toCvShare(l_raw_msg, l_raw_msg->encoding)->image;
@@ -222,6 +265,19 @@ void StereoprocNodelet::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, con
     cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(r_cpu_raw));
 }
 
+inline bool isValidPoint(const cv::Vec3f &pt)
+{
+    // Check both for disparities explicitly marked as invalid (where OpenCV maps pt.z to MISSING_Z)
+    // and zero disparities (point mapped to infinity).
+    return pt[2] != image_geometry::StereoCameraModel::MISSING_Z && !std::isinf(pt[2]);
+}
+
+void StereoprocNodelet::filterSpeckles(void)
+{
+    cv::Mat disp = filter_buf_.createMatHeader();
+    cv::filterSpeckles(disp, 0, maxSpeckleSize_, maxDiff_ * 256);
+}
+
 void StereoprocNodelet::sendDisparity(void) { pub_disparity_.publish(disp_msg_); }
 
 void StereoprocNodelet::configCb(Config &config, uint32_t level)
@@ -237,20 +293,20 @@ void StereoprocNodelet::configCb(Config &config, uint32_t level)
     stereoProcessor_->setTextureThreshold(config.texture_threshold);
     NODELET_INFO("Reconfigure winsz:%d ndisp:%d tex:%3.1f", config.correlation_window_size, config.disparity_range, config.texture_threshold);
 
-//    if (bilateral_filter_.empty())
-//    {
-//        bilateral_filter_ = cv::cuda::createDisparityBilateralFilter(config.filter_ndisp, config.filter_radius, config.filter_iters);
-//    }
-//    bilateral_filter_->setNumDisparities(config.filter_ndisp);
-//    bilateral_filter_->setRadius(config.filter_radius);
-//    bilateral_filter_->setNumIters(config.filter_iters);
+    //    if (bilateral_filter_.empty())
+    //    {
+    //        bilateral_filter_ = cv::cuda::createDisparityBilateralFilter(config.filter_ndisp, config.filter_radius, config.filter_iters);
+    //    }
+    //    bilateral_filter_->setNumDisparities(config.filter_ndisp);
+    //    bilateral_filter_->setRadius(config.filter_radius);
+    //    bilateral_filter_->setNumIters(config.filter_iters);
 
-//    bilateral_filter_->setEdgeThreshold(config.filter_edge_threshold);
-//    bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
-//    bilateral_filter_->setSigmaRange(config.filter_sigma_range);
-//    bilateral_filter_enabled_ = config.bilateral_filter;
-//    maxDiff_                  = config.max_diff;
-//    maxSpeckleSize_           = config.max_speckle_size;
+    //    bilateral_filter_->setEdgeThreshold(config.filter_edge_threshold);
+    //    bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
+    //    bilateral_filter_->setSigmaRange(config.filter_sigma_range);
+    //    bilateral_filter_enabled_ = config.bilateral_filter;
+    //    maxDiff_                  = config.max_diff;
+    //    maxSpeckleSize_           = config.max_speckle_size;
 }
 
 } // namespace stereo_image_proc
