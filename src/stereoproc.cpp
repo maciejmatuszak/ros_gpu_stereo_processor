@@ -310,5 +310,3 @@ void StereoProcessor::configCb(Config &config, uint32_t level)
 }
 
 } // namespace stereo_image_proc
-
-

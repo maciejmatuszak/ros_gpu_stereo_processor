@@ -63,6 +63,7 @@ class GpuStereoProcessor
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
+    void computeDisparity(cv::Mat& left, cv::Mat& right, cv::Mat& disparity);
     void waitForStream(GpuMatSource stream_source);
     void waitForAllStreams();
     void cleanSenders();
@@ -84,7 +85,8 @@ class GpuStereoProcessor
 
     image_geometry::StereoCameraModel model_;
 
-    cv::Ptr<cv::cuda::StereoBM> block_matcher_;
+    cv::Ptr<cv::cuda::StereoBM> block_matcher_gpu_;
+    cv::Ptr<cv::StereoBM> block_matcher_cpu_;
     cv::Ptr<cv::cuda::DisparityBilateralFilter> bilateral_filter_;
     std::string l_cam_name_, r_cam_name;
 
