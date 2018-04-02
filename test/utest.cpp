@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <cv_bridge/cv_bridge.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -165,12 +166,14 @@ TEST_F(CudaStereoBMTf, RectifyMonoGpu)
     stereo_processor_.rectifyImage(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_RECT_MONO, cv::INTER_LINEAR);
     stereo_processor_.rectifyImage(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_RECT_MONO, cv::INTER_LINEAR);
     cv::Mat l_rect_cpu, r_rect_cpu;
-    cv::Mat l_rect_gpu, r_rect_gpu,
-            disparity_gpu, disparity_cpu;
+    cv::Mat l_rect_gpu, r_rect_gpu, disparity_gpu, disparity_cpu;
     stereo_processor_.computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
+    std_msgs::Header mh;
+    auto img = cv_bridge::CvImage(mh, sensor_msgs::image_encodings::MONO8, l_raw_).toImageMsg();
+    stereo_processor_.enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY, img, (ros::Publisher *)NULL);
 
     stereo_processor_.downloadMat(GPU_MAT_SRC_L_RECT_MONO, l_rect_gpu);
-    stereo_processor_.downloadMat(GPU_MAT_SRC_R_RECT_MONO, r_rect_gpu);    
+    stereo_processor_.downloadMat(GPU_MAT_SRC_R_RECT_MONO, r_rect_gpu);
     stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, disparity_gpu);
     stereo_processor_.computeDisparity(l_rect_gpu, r_rect_gpu, disparity_cpu);
 

@@ -95,19 +95,21 @@ cv::cuda::Stream &GpuStereoProcessor::getStream(GpuMatSource source)
     }
 }
 
-void GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher &pub)
+GPUSender::Ptr GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub)
 {
     GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern, encoding, pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(source), getStream(source));
+    return t;
 }
 
-void GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher &pub)
+GPUSender::Ptr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
     GPUSender::Ptr t =
         boost::make_shared<GPUSender>(imagePattern, block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(), block_matcher_gpu_->getMinDisparity(), pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(source), getStream(source));
+    return t;
 }
 
 void GpuStereoProcessor::colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn)

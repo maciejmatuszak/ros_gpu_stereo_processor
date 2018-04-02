@@ -56,8 +56,8 @@ class GpuStereoProcessor
     bool isStereoModelInitialised();
     void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
-    void enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher &pub);
-    void enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher &pub);
+    GPUSender::Ptr enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub);
+    GPUSender::Ptr enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
     void colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);

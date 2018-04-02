@@ -180,7 +180,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     }
     if (connected_.DebayerMonoLeft)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_MONO, l_raw_msg, sensor_msgs::image_encodings::MONO8, pub_mono_left_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_MONO, l_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_left_);
     }
 
     if (connected_.DebayerMonoRight || connected_.RectifyMonoRight || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
@@ -189,7 +189,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     }
     if (connected_.DebayerMonoRight)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_MONO, r_raw_msg, sensor_msgs::image_encodings::MONO8, pub_mono_right_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_MONO, r_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_right_);
     }
 
     if (connected_.DebayerColorLeft || connected_.RectifyColorLeft || connected_.Pointcloud)
@@ -198,7 +198,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     }
     if (connected_.DebayerColorLeft)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_COLOR, l_raw_msg, sensor_msgs::image_encodings::BGR8, pub_color_left_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_COLOR, l_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_left_);
     }
 
     if (connected_.DebayerColorRight || connected_.RectifyColorRight)
@@ -207,7 +207,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     }
     if (connected_.DebayerColorRight)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, pub_color_right_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_right_);
     }
 
     if (connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
@@ -221,12 +221,12 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.RectifyMonoLeft)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_RECT_MONO, l_raw_msg, sensor_msgs::image_encodings::MONO8, pub_mono_rect_left_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_RECT_MONO, l_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_left_);
     }
 
     if (connected_.RectifyMonoRight)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_MONO, r_raw_msg, sensor_msgs::image_encodings::MONO8, pub_mono_rect_right_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_MONO, r_raw_msg, sensor_msgs::image_encodings::MONO8, &pub_mono_rect_right_);
     }
 
     if (connected_.RectifyColorLeft || connected_.Pointcloud)
@@ -240,12 +240,12 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.RectifyColorLeft)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_RECT_COLOR, l_raw_msg, sensor_msgs::image_encodings::BGR8, pub_color_rect_left_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_RECT_COLOR, l_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_left_);
     }
 
     if (connected_.RectifyColorRight)
     {
-        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, pub_color_rect_right_);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_right_);
     }
 
     if (connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
@@ -255,7 +255,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.Disparity)
     {
-        stereoProcessor_->enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY_32F, l_raw_msg, pub_disparity_);
+        stereoProcessor_->enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY_32F, l_raw_msg, &pub_disparity_);
     }
 
     if (connected_.DisparityVis)

@@ -12,7 +12,7 @@ namespace gpuimageproc
 class GPUSender
 {
   public:
-    GPUSender(sensor_msgs::ImageConstPtr example, std::string encoding, ros::Publisher &pub)
+    GPUSender(sensor_msgs::ImageConstPtr example, std::string encoding, ros::Publisher *pub)
         : publisher_(pub)
     {
         image_msg_ = boost::make_shared<sensor_msgs::Image>();
@@ -29,7 +29,7 @@ class GPUSender
         cv::cuda::registerPageLocked(cpu_data_);
     }
 
-    GPUSender(sensor_msgs::ImageConstPtr example, int blockSize, int numDisparities, int minDisparity, ros::Publisher &pub)
+    GPUSender(sensor_msgs::ImageConstPtr example, int blockSize, int numDisparities, int minDisparity, ros::Publisher *pub)
         : publisher_(pub)
     {
         disp_msg_               = boost::make_shared<stereo_msgs::DisparityImage>();
@@ -55,7 +55,7 @@ class GPUSender
         disp_msg_->image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
         disp_msg_->image.step     = example->width * sizeof(float);
         disp_msg_->image.data.resize(disp_msg_->image.step * disp_msg_->image.height);
-        cpu_data_ = cv::Mat_<float>(disp_msg_->image.height, disp_msg_->image.width, (float *)&disp_msg_->image.data[0], disp_msg_->image.step);
+        cpu_data_ = cv::Mat(disp_msg_->image.height, disp_msg_->image.width, CV_32FC1, (void *)&disp_msg_->image.data[0], disp_msg_->image.step);
         cv::cuda::registerPageLocked(cpu_data_);
     }
 
@@ -63,19 +63,22 @@ class GPUSender
 
     void send(void)
     {
-        if (image_msg_)
+        if (image_msg_ && publisher_)
         {
-            publisher_.publish(image_msg_);
+            publisher_->publish(image_msg_);
         }
-        if (disp_msg_)
+        if (disp_msg_ && publisher_)
         {
-            publisher_.publish(disp_msg_);
+            publisher_->publish(disp_msg_);
         }
     }
 
     void enqueueSend(cv::cuda::GpuMat &m, cv::cuda::Stream &strm)
     {
+        auto vptr = (void*)&cpu_data_.data[0];
         m.download(cpu_data_, strm);
+        //cpu_data_ should be constructed in such a way that it does not require resize
+        assert(vptr == (void*)&cpu_data_.data[0]);
         strm.enqueueHostCallback(
             [](int status, void *userData) {
                 (void)status;
@@ -83,12 +86,14 @@ class GPUSender
             },
             (void *)this);
     }
+    cv::Mat& getCpuData() { return cpu_data_; }
+
     typedef boost::shared_ptr<GPUSender> Ptr;
 
   private:
     sensor_msgs::ImagePtr image_msg_;
     stereo_msgs::DisparityImagePtr disp_msg_;
     cv::Mat cpu_data_;
-    ros::Publisher &publisher_;
+    ros::Publisher *publisher_;
 };
 } // namespace
