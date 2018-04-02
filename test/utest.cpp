@@ -1,10 +1,10 @@
 #include "image_geometry/pinhole_camera_model.h"
 #include <boost/filesystem.hpp>
+#include <cv_bridge/cv_bridge.h>
 #include <gpuimageproc/gpustereoprocessor.h>
 #include <gtest/gtest.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <cv_bridge/cv_bridge.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -166,15 +166,16 @@ TEST_F(CudaStereoBMTf, RectifyMonoGpu)
     stereo_processor_.rectifyImage(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_RECT_MONO, cv::INTER_LINEAR);
     stereo_processor_.rectifyImage(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_RECT_MONO, cv::INTER_LINEAR);
     cv::Mat l_rect_cpu, r_rect_cpu;
-    cv::Mat l_rect_gpu, r_rect_gpu, disparity_gpu, disparity_cpu;
+    cv::Mat l_rect_gpu, r_rect_gpu, disparity_cpu, disparity_gpu_cv_8u;
     stereo_processor_.computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
     std_msgs::Header mh;
-    auto img = cv_bridge::CvImage(mh, sensor_msgs::image_encodings::MONO8, l_raw_).toImageMsg();
-    stereo_processor_.enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY, img, (ros::Publisher *)NULL);
+    auto img    = cv_bridge::CvImage(mh, sensor_msgs::image_encodings::MONO8, l_raw_).toImageMsg();
+    auto sender = stereo_processor_.enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY_32F, img, (ros::Publisher *)NULL);
+    stereo_processor_.waitForAllStreams();
 
     stereo_processor_.downloadMat(GPU_MAT_SRC_L_RECT_MONO, l_rect_gpu);
     stereo_processor_.downloadMat(GPU_MAT_SRC_R_RECT_MONO, r_rect_gpu);
-    stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, disparity_gpu);
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, disparity_gpu_cv_8u);
     stereo_processor_.computeDisparity(l_rect_gpu, r_rect_gpu, disparity_cpu);
 
     stereo_processor_.rectifyImageLeft(l_raw_, l_rect_cpu, cv::INTER_LINEAR);
@@ -182,12 +183,12 @@ TEST_F(CudaStereoBMTf, RectifyMonoGpu)
 
     createStereoWithEpipolar(l_rect_gpu, r_rect_gpu, (test_data_path / "stereobm/RectifyMonoGpu_rect_gpu.png").string());
     createStereoWithEpipolar(l_rect_cpu, r_rect_cpu, (test_data_path / "stereobm/RectifyMonoGpu_rect_cpu.png").string());
-    createStereoWithEpipolar(l_rect_gpu, disparity_gpu, (test_data_path / "stereobm/RectifyMonoGpu_rect_disp.png").string());
     cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_l_rect_cpu.png").string(), l_rect_cpu);
     cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_r_rect_cpu.png").string(), r_rect_cpu);
     cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_l_rect_gpu.png").string(), l_rect_gpu);
     cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_r_rect_gpu.png").string(), r_rect_gpu);
-    cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_l_disp_gpu.png").string(), disparity_gpu);
+    cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_l_disp_gpu.png").string(), sender->getCpuData());
+    cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_l_disp_gpu_8u.png").string(), disparity_gpu_cv_8u);
     cv::imwrite((test_data_path / "stereobm/RectifyMonoGpu_l_disp_cpu.png").string(), disparity_cpu);
     // ASSERT_TRUE(mat_are_same(l_rect, l_rect_));
     // ASSERT_TRUE(mat_are_same(r_rect, r_rect_));

@@ -86,7 +86,10 @@ class GPUSender
             },
             (void *)this);
     }
-    cv::Mat& getCpuData() { return cpu_data_; }
+    cv::Mat& getCpuData()
+    {
+        return cpu_data_;
+    }
 
     typedef boost::shared_ptr<GPUSender> Ptr;
 
