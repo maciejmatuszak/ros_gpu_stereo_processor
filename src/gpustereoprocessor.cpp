@@ -1,12 +1,16 @@
 #include "gpuimageproc/gpustereoprocessor.h"
 #include <camera_calibration_parsers/parse.h>
+#include <cv_bridge/cv_bridge.h>
 
 namespace gpuimageproc
 {
 
 GpuStereoProcessor::GpuStereoProcessor()
+    : l_raw_encoding_("")
+    , r_raw_encoding_("")
+
 {
-    cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
+    // cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
     block_matcher_gpu_ = cv::cuda::createStereoBM(128, 19);
     block_matcher_gpu_->setRefineDisparity(false);
     block_matcher_cpu_ = cv::StereoBM::create(128, 19);
@@ -28,7 +32,6 @@ GpuStereoProcessor::GpuStereoProcessor()
     block_matcher_cpu_->setSpeckleWindowSize(0);
     block_matcher_cpu_->setTextureThreshold(block_matcher_gpu_->getTextureThreshold());
     block_matcher_cpu_->setUniquenessRatio(block_matcher_gpu_->getUniquenessRatio());
-
 }
 
 void GpuStereoProcessor::initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg)
@@ -51,10 +54,48 @@ void GpuStereoProcessor::initStereoModel(const std::string &left_cal_file, const
 
 bool GpuStereoProcessor::isStereoModelInitialised() { return model_.initialized(); }
 
-void GpuStereoProcessor::uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat)
+void GpuStereoProcessor::convertRawToColor(GpuMatSource side)
+{
+    if ((side & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L)
+    {
+        convertColor(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_COLOR, l_raw_encoding_, sensor_msgs::image_encodings::BGR8);
+    }
+    else
+    {
+        convertColor(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_COLOR, r_raw_encoding_, sensor_msgs::image_encodings::BGR8);
+    }
+}
+
+void GpuStereoProcessor::convertRawToMono(GpuMatSource side)
+{
+
+    if ((side & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L)
+    {
+        convertColor(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_MONO, l_raw_encoding_, sensor_msgs::image_encodings::MONO8);
+    }
+    else
+    {
+        convertColor(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_MONO, r_raw_encoding_, sensor_msgs::image_encodings::MONO8);
+    }
+}
+void GpuStereoProcessor::uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat, std::string encoding)
 {
     auto gmat = getGpuMat(mat_source);
     gmat->upload(cv_mat, getStream(mat_source));
+    if (encoding.empty())
+    {
+        return;
+    }
+
+    // store the encoding
+    if ((mat_source & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L)
+    {
+        l_raw_encoding_ = encoding;
+    }
+    else
+    {
+        r_raw_encoding_ = encoding;
+    }
 }
 
 void GpuStereoProcessor::downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat)
@@ -63,6 +104,54 @@ void GpuStereoProcessor::downloadMat(GpuMatSource mat_source, const cv::Mat &cv_
     cv::cuda::createContinuous(gmat->size(), gmat->type(), cv_mat);
     gmat->download(cv_mat, getStream(mat_source));
     getStream(mat_source).waitForCompletion();
+}
+
+void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_dst, const std::string &src_encoding, const std::string &dst_encoding)
+{
+    // Copy metadata
+    auto srcMat    = getGpuMat(mat_source);
+    auto dstMat    = getGpuMat(mat_dst);
+    auto srcStream = getStream(mat_source);
+
+    // Copy to new buffer if same encoding requested
+    if (dst_encoding.empty() || dst_encoding == src_encoding)
+    {
+        srcMat->copyTo(*dstMat);
+    }
+    else
+    {
+        // Convert the source data to the desired encoding
+        const std::vector<int> conversion_codes = cv_bridge::getConversionCode(src_encoding, dst_encoding);
+        assert(conversion_codes.size() == 1);
+        // for (size_t i = 0; i < conversion_codes.size(); ++i)
+        //{
+        int conversion_code = conversion_codes[0];
+        if (conversion_code == cv_bridge::SAME_FORMAT)
+        {
+            // Same number of channels, but different bit depth
+            int src_depth = sensor_msgs::image_encodings::bitDepth(src_encoding);
+            int dst_depth = sensor_msgs::image_encodings::bitDepth(dst_encoding);
+            // Keep the number of channels for now but changed to the final depth
+            // int image2_type = CV_MAKETYPE(CV_MAT_DEPTH(getCvType(dst_encoding)), image1.channels());
+            int image2_type = cv_bridge::getCvType(dst_encoding);
+
+            // Do scaling between CV_8U [0,255] and CV_16U [0,65535] images.
+            if (src_depth == 8 && dst_depth == 16)
+                srcMat->convertTo(*dstMat, image2_type, 65535. / 255., srcStream);
+            else if (src_depth == 16 && dst_depth == 8)
+                srcMat->convertTo(*dstMat, image2_type, 255. / 65535., srcStream);
+            else
+                srcMat->convertTo(*dstMat, image2_type, srcStream);
+        }
+        else
+        {
+            // Perform color conversion
+            int dcn = sensor_msgs::image_encodings::numChannels(dst_encoding);
+            cv::cuda::cvtColor(*srcMat, *dstMat, conversion_code, dcn, srcStream);
+        }
+        // image1 = image2;
+        //}
+    }
 }
 
 boost::shared_ptr<cv::cuda::GpuMat> GpuStereoProcessor::getGpuMat(GpuMatSource source)
@@ -85,12 +174,10 @@ cv::cuda::Stream &GpuStereoProcessor::getStream(GpuMatSource source)
 {
     if ((source & GPU_MAT_SIDE_L) == GPU_MAT_SIDE_L)
     {
-        ROS_INFO("getStream L");
         return l_strm;
     }
     else // if(source & GPU_MAT_SRC_MASK_R == GPU_MAT_SRC_MASK_R)
     {
-        ROS_INFO("getStream R");
         return r_strm;
     }
 }
@@ -112,31 +199,34 @@ GPUSender::Ptr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, con
     return t;
 }
 
-void GpuStereoProcessor::colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn)
-{
-    cv::cuda::demosaicing(*getGpuMat(source), *getGpuMat(dest), colorConversion, dcn, getStream(source));
-}
-
 void GpuStereoProcessor::rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation)
 {
+    assert(model_.initialized());
     if ((source & GPU_MAT_SIDE_L) == GPU_MAT_SIDE_L)
     {
-        ROS_INFO("rectifyImage L");
         model_.left().rectifyImageGPU(*getGpuMat(source), *getGpuMat(dest), interpolation, getStream(source));
     }
     else
     {
-        ROS_INFO("rectifyImage R");
         model_.right().rectifyImageGPU(*getGpuMat(source), *getGpuMat(dest), interpolation, getStream(source));
     }
 }
 
-void GpuStereoProcessor::rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation) { model_.left().rectifyImage(source, dest, interpolation); }
+void GpuStereoProcessor::rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation)
+{
+    assert(model_.initialized());
+    model_.left().rectifyImage(source, dest, interpolation);
+}
 
-void GpuStereoProcessor::rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation) { model_.right().rectifyImage(source, dest, interpolation); }
+void GpuStereoProcessor::rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation)
+{
+    assert(model_.initialized());
+    model_.right().rectifyImage(source, dest, interpolation);
+}
 
 void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity)
 {
+    assert(model_.initialized());
     // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
     static const int DPP        = 16; // disparities per pixel
     static const double inv_dpp = 1.0 / DPP;
@@ -159,12 +249,13 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
 
 void GpuStereoProcessor::computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity)
 {
+    assert(model_.initialized());
     // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
     static const int DPP        = 16; // disparities per pixel
     static const double inv_dpp = 1.0 / DPP;
 
     block_matcher_cpu_->compute(left, right, disparity);
-    disparity.convertTo(disparity,  CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
+    disparity.convertTo(disparity, CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
 }
 
 void GpuStereoProcessor::waitForStream(GpuMatSource stream_source) { getStream(stream_source).waitForCompletion(); }
@@ -183,10 +274,7 @@ void GpuStereoProcessor::setPreFilterType(int filter_type)
     block_matcher_cpu_->setPreFilterType(filter_type);
 }
 
-void GpuStereoProcessor::setRefineDisparity(bool ref_disp)
-{
-    block_matcher_gpu_->setRefineDisparity(ref_disp);
-}
+void GpuStereoProcessor::setRefineDisparity(bool ref_disp) { block_matcher_gpu_->setRefineDisparity(ref_disp); }
 
 void GpuStereoProcessor::setBlockSize(int block_size)
 {

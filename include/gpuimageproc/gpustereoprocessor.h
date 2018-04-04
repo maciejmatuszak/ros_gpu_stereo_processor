@@ -45,6 +45,10 @@ enum GpuMatSource
     GPU_MAT_SRC_R_DISPARITY_32F = GPU_MAT_SRC_DISPARITY_32F | GPU_MAT_SIDE_R
 };
 
+inline GpuMatSource operator&(GpuMatSource a, GpuMatSource b) { return static_cast<GpuMatSource>(static_cast<int>(a) & static_cast<int>(b)); }
+
+inline GpuMatSource operator|(GpuMatSource a, GpuMatSource b) { return static_cast<GpuMatSource>(static_cast<int>(a) | static_cast<int>(b)); }
+
 class GpuStereoProcessor
 {
 
@@ -54,16 +58,18 @@ class GpuStereoProcessor
     void initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg);
     void initStereoModel(const std::string &left_cal_file, const std::string &right_cal_file);
     bool isStereoModelInitialised();
-    void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
+    void convertRawToColor(GpuMatSource side);
+    void convertRawToMono(GpuMatSource side);
+    void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat, std::string encoding = "");
     void downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
+    void convertColor(GpuMatSource mat_source, GpuMatSource mat_dst, const std::string &src_encoding, const std::string &dst_encoding);
     GPUSender::Ptr enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub);
     GPUSender::Ptr enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
-    void colorConvertImage(GpuMatSource source, GpuMatSource dest, int colorConversion, int dcn);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
-    void computeDisparity(cv::Mat& left, cv::Mat& right, cv::Mat& disparity);
+    void computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity);
     void waitForStream(GpuMatSource stream_source);
     void waitForAllStreams();
     void cleanSenders();
@@ -89,6 +95,7 @@ class GpuStereoProcessor
     cv::Ptr<cv::StereoBM> block_matcher_cpu_;
     cv::Ptr<cv::cuda::DisparityBilateralFilter> bilateral_filter_;
     std::string l_cam_name_, r_cam_name;
+    std::string l_raw_encoding_, r_raw_encoding_;
 
     bool bilateral_filter_enabled_;
     int maxSpeckleSize_;

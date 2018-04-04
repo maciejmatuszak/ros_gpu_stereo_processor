@@ -176,7 +176,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DebayerMonoLeft || connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
-        stereoProcessor_->colorConvertImage(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_MONO, CV_BayerRG2GRAY, 1);
+        stereoProcessor_->convertRawToMono(GPU_MAT_SIDE_L);
     }
     if (connected_.DebayerMonoLeft)
     {
@@ -185,7 +185,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DebayerMonoRight || connected_.RectifyMonoRight || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
-        stereoProcessor_->colorConvertImage(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_MONO, CV_BayerRG2GRAY, 1);
+        stereoProcessor_->convertRawToMono(GPU_MAT_SIDE_R);
     }
     if (connected_.DebayerMonoRight)
     {
@@ -194,7 +194,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DebayerColorLeft || connected_.RectifyColorLeft || connected_.Pointcloud)
     {
-        stereoProcessor_->colorConvertImage(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_COLOR, CV_BayerRG2BGR, 3);
+        stereoProcessor_->convertRawToColor(GPU_MAT_SIDE_L);
     }
     if (connected_.DebayerColorLeft)
     {
@@ -203,7 +203,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DebayerColorRight || connected_.RectifyColorRight)
     {
-        stereoProcessor_->colorConvertImage(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_COLOR, CV_BayerRG2BGR, 3);
+        stereoProcessor_->convertRawToColor(GPU_MAT_SIDE_R);
     }
     if (connected_.DebayerColorRight)
     {
