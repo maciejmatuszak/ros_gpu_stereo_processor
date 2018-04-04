@@ -6,7 +6,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/image_encodings.h>
 #include <stereo_msgs/DisparityImage.h>
-
+#include <boost/timer.hpp>
 #include "gpuimageproc/stereoproc.h"
 
 namespace gpuimageproc
@@ -17,8 +17,8 @@ StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_n
     , private_nh(private_nh)
 {
     stereoProcessor_        = boost::make_shared<GpuStereoProcessor>();
-    camera_info_file_left_  = "";
-    camera_info_file_right_ = "";
+    camera_info_file_left_  = "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/left.yaml";
+    camera_info_file_right_ = "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/right.yaml";
 
     it_.reset(new image_transport::ImageTransport(nh));
 
@@ -152,6 +152,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 {
     boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
+    boost::timer perf_timer;
     int level = connected_.level();
     ROS_DEBUG("got images, level %d", level);
 
@@ -166,13 +167,13 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     }
 
     // Create cv::Mat views onto all buffers
-    const cv::Mat l_cpu_raw = cv_bridge::toCvShare(l_raw_msg, l_raw_msg->encoding)->image;
-    cv::cuda::registerPageLocked(const_cast<cv::Mat &>(l_cpu_raw));
-    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_L_RAW, l_cpu_raw);
+    auto l_cpu_raw = cv_bridge::toCvShare(l_raw_msg, l_raw_msg->encoding);
+    auto r_cpu_raw = cv_bridge::toCvShare(r_raw_msg, r_raw_msg->encoding);
+    cv::cuda::registerPageLocked(const_cast<cv::Mat &>(l_cpu_raw->image));
+    cv::cuda::registerPageLocked(const_cast<cv::Mat &>(r_cpu_raw->image));
 
-    const cv::Mat r_cpu_raw = cv_bridge::toCvShare(r_raw_msg, r_raw_msg->encoding)->image;
-    cv::cuda::registerPageLocked(const_cast<cv::Mat &>(r_cpu_raw));
-    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_R_RAW, r_cpu_raw);
+    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_L_RAW, l_cpu_raw->image, l_cpu_raw->encoding);
+    stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_R_RAW, r_cpu_raw->image, r_cpu_raw->encoding);
 
     if (connected_.DebayerMonoLeft || connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
@@ -263,8 +264,10 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
         // TODO
     }
     stereoProcessor_->waitForAllStreams();
-    cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(l_cpu_raw));
-    cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(r_cpu_raw));
+    double duration = perf_timer.elapsed();
+    ROS_INFO("Image Callback took: %.2f [ms]", duration * 1000.0);
+    cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(l_cpu_raw->image));
+    cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(r_cpu_raw->image));
 }
 
 inline bool isValidPoint(const cv::Vec3f &pt)

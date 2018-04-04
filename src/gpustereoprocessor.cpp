@@ -108,6 +108,8 @@ void GpuStereoProcessor::downloadMat(GpuMatSource mat_source, const cv::Mat &cv_
 
 void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_dst, const std::string &src_encoding, const std::string &dst_encoding)
 {
+    assert(!src_encoding.empty());
+    assert(!dst_encoding.empty());
     // Copy metadata
     auto srcMat    = getGpuMat(mat_source);
     auto dstMat    = getGpuMat(mat_dst);
