@@ -102,16 +102,16 @@ include_directories(
 
 ## Declare a cpp library
 add_library(${PROJECT_NAME}
-    src/gpustereoprocessor.cpp
-    src/stereoproc.cpp
-    src/stereoprocnodelet.cpp
+    src/GPUStereoProcessor.cpp
+    src/StereoProcessor.cpp
+    src/StereoProcessorNodelet.cpp
 
 )
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 add_dependencies(${PROJECT_NAME} ${PROJECT_NAME}_gencfg)
 
 add_executable(${PROJECT_NAME}_node
-        src/stereo_proc_node.cpp
+        src/StereoProcessorNode.cpp
         )
 target_link_libraries(${PROJECT_NAME}_node
     ${PROJECT_NAME})

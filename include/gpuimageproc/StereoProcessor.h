@@ -17,8 +17,8 @@
 #include <stereo_msgs/DisparityImage.h>
 
 #include "gpuimageproc/GPUConfig.h"
-#include "gpuimageproc/connectedtopics.h"
-#include "gpuimageproc/gpustereoprocessor.h"
+#include "gpuimageproc/ConnectedTopics.h"
+#include "gpuimageproc/GPUStereoProcessor.h"
 
 namespace gpuimageproc
 {

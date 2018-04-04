@@ -1,7 +1,7 @@
 #pragma once
 
 #include <nodelet/nodelet.h>
-#include "gpuimageproc/stereoproc.h"
+#include "gpuimageproc/StereoProcessor.h"
 
 namespace gpuimageproc
 {

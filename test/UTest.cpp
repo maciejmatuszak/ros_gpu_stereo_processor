@@ -1,8 +1,8 @@
-#include "image_geometry/pinhole_camera_model.h"
 #include <boost/filesystem.hpp>
 #include <cv_bridge/cv_bridge.h>
-#include <gpuimageproc/gpustereoprocessor.h>
+#include <gpuimageproc/GPUStereoProcessor.h>
 #include <gtest/gtest.h>
+#include <image_geometry/pinhole_camera_model.h>
 #include <opencv2/core.hpp>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/highgui/highgui.hpp>

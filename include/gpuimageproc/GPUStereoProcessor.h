@@ -1,5 +1,5 @@
 #pragma once
-#include "gpuimageproc/gpu_sender.h"
+#include "gpuimageproc/GpuSender.h"
 #include <image_geometry/stereo_camera_model.h>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/cudaarithm.hpp>

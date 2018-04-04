@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include "gpuimageproc/stereoproc.h"
+#include "gpuimageproc/StereoProcessor.h"
 
 int main(int argc, char **argv)
 {

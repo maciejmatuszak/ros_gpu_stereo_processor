@@ -1,4 +1,4 @@
-#include "gpuimageproc/gpustereoprocessor.h"
+#include "gpuimageproc/GPUStereoProcessor.h".h"
 #include <camera_calibration_parsers/parse.h>
 #include <cv_bridge/cv_bridge.h>
 

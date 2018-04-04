@@ -1,4 +1,4 @@
-#include "gpuimageproc/stereoprocnodelet.h"
+#include "gpuimageproc/StereoProcessorNodelet.h"
 
 namespace gpuimageproc
 {

@@ -7,7 +7,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <stereo_msgs/DisparityImage.h>
 #include <boost/timer.hpp>
-#include "gpuimageproc/stereoproc.h"
+#include "gpuimageproc/StereoProcessor.h"
 
 namespace gpuimageproc
 {

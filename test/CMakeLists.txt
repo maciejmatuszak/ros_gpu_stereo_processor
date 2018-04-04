@@ -11,7 +11,7 @@ endif()
 
 
 # Now simply link your own targets against gtest, gmock,
-add_executable(${PROJECT_NAME}-gtest utest.cpp)
+add_executable(${PROJECT_NAME}-gtest UTest.cpp)
 target_link_libraries(${PROJECT_NAME}-gtest ${GTEST_LIBRARIES})
 target_link_libraries(${PROJECT_NAME}-gtest ${PROJECT_NAME})
 
