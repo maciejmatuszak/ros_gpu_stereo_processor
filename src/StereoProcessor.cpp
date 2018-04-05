@@ -2,12 +2,12 @@
 #include <image_transport/image_transport.h>
 #include <pluginlib/class_list_macros.h>
 
+#include "gpuimageproc/StereoProcessor.h"
+#include <boost/timer.hpp>
 #include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/image_encodings.h>
 #include <stereo_msgs/DisparityImage.h>
-#include <boost/timer.hpp>
-#include "gpuimageproc/StereoProcessor.h"
 
 namespace gpuimageproc
 {
@@ -263,6 +263,13 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     {
         // TODO
     }
+
+    if (connected_.Pointcloud)
+    {
+        stereoProcessor_->projectDisparityTo3DPoints(GPU_MAT_SRC_L_DISPARITY_32F, GPU_MAT_SRC_L_POINTS2);
+        stereoProcessor_->enqueueSendPoints(GPU_MAT_SRC_L_POINTS2, GPU_MAT_SRC_L_RECT_COLOR, l_raw_msg, &pub_pointcloud_);
+    }
+
     stereoProcessor_->waitForAllStreams();
     double duration = perf_timer.elapsed();
     ROS_INFO("Image Callback took: %.2f [ms]", duration * 1000.0);

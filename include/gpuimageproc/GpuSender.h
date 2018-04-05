@@ -3,8 +3,10 @@
 #include <ros/ros.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/image_encodings.h>
 #include <stereo_msgs/DisparityImage.h>
+#include <image_geometry/stereo_camera_model.h>
 
 namespace gpuimageproc
 {
@@ -12,6 +14,42 @@ namespace gpuimageproc
 class GPUSender
 {
   public:
+    GPUSender(sensor_msgs::ImageConstPtr example, ros::Publisher *pub)
+        : publisher_(pub)
+    {
+        points_msg_         = boost::make_shared<sensor_msgs::PointCloud2>();
+        points_msg_->header = example->header;
+        points_msg_->height = example->height;
+        points_msg_->width  = example->width;
+        points_msg_->fields.resize(4);
+        points_msg_->fields[0].name     = "x";
+        points_msg_->fields[0].offset   = 0;
+        points_msg_->fields[0].count    = 1;
+        points_msg_->fields[0].datatype = sensor_msgs::PointField::FLOAT32;
+        points_msg_->fields[1].name     = "y";
+        points_msg_->fields[1].offset   = 4;
+        points_msg_->fields[1].count    = 1;
+        points_msg_->fields[1].datatype = sensor_msgs::PointField::FLOAT32;
+        points_msg_->fields[2].name     = "z";
+        points_msg_->fields[2].offset   = 8;
+        points_msg_->fields[2].count    = 1;
+        points_msg_->fields[2].datatype = sensor_msgs::PointField::FLOAT32;
+        points_msg_->fields[3].name     = "rgb";
+        points_msg_->fields[3].offset   = 12;
+        points_msg_->fields[3].count    = 1;
+        points_msg_->fields[3].datatype = sensor_msgs::PointField::FLOAT32;
+        // points_msg_->is_bigendian = false; ???
+
+        points_msg_->point_step = STEP;
+        points_msg_->row_step   = points_msg_->point_step * points_msg_->width;
+        points_msg_->data.resize(points_msg_->row_step * points_msg_->height);
+        points_msg_->is_dense = false; // there may be invalid points
+        cpu_data_             = cv::Mat(image_msg_->height, image_msg_->width, CV_32FC3, &(points_msg_->data[0]), points_msg_->row_step);
+        cpu_color_data_.create(image_msg_->height, image_msg_->width, CV_32FC3);
+
+        cv::cuda::registerPageLocked(cpu_data_);
+    }
+
     GPUSender(sensor_msgs::ImageConstPtr example, std::string encoding, ros::Publisher *pub)
         : publisher_(pub)
     {
@@ -61,6 +99,60 @@ class GPUSender
 
     ~GPUSender() { cv::cuda::unregisterPageLocked(cpu_data_); }
 
+    inline bool isValidPoint(const cv::Vec3f& pt)
+    {
+      // Check both for disparities explicitly marked as invalid (where OpenCV maps pt.z to MISSING_Z)
+      // and zero disparities (point mapped to infinity).
+      return pt[2] != image_geometry::StereoCameraModel::MISSING_Z && !std::isinf(pt[2]);
+    }
+
+    void fillInPointMessage()
+    {
+        // fill in points
+        const cv::Mat_<cv::Vec3b> cpu_xyz(cpu_data_);
+        float bad_point = std::numeric_limits<float>::quiet_NaN();
+        int offset      = 0;
+        for (int v = 0; v < cpu_xyz.rows; ++v)
+        {
+            for (int u = 0; u < cpu_xyz.cols; ++u, offset += STEP)
+            {
+                if (isValidPoint(cpu_xyz(v, u)))
+                {
+                    // x,y,z,rgba
+                    memcpy(&points_msg_->data[offset + 0], &cpu_xyz(v, u)[0], sizeof(float));
+                    memcpy(&points_msg_->data[offset + 4], &cpu_xyz(v, u)[1], sizeof(float));
+                    memcpy(&points_msg_->data[offset + 8], &cpu_xyz(v, u)[2], sizeof(float));
+                }
+                else
+                {
+                    memcpy(&points_msg_->data[offset + 0], &bad_point, sizeof(float));
+                    memcpy(&points_msg_->data[offset + 4], &bad_point, sizeof(float));
+                    memcpy(&points_msg_->data[offset + 8], &bad_point, sizeof(float));
+                }
+            }
+        }
+
+        // Fill in color
+        offset = 0;
+        const cv::Mat_<cv::Vec3b> color(cpu_color_data_);
+        for (int v = 0; v < cpu_xyz.rows; ++v)
+        {
+            for (int u = 0; u < cpu_xyz.cols; ++u, offset += STEP)
+            {
+                if (isValidPoint(cpu_xyz(v,u)))
+                {
+                    const cv::Vec3b& bgr = color(v,u);
+                    int32_t rgb_packed = (bgr[2] << 16) | (bgr[1] << 8) | bgr[0];
+                    memcpy (&points_msg_->data[offset + 12], &rgb_packed, sizeof (int32_t));
+                }
+                else
+                {
+                    memcpy (&points_msg_->data[offset + 12], &bad_point, sizeof (float));
+                }
+            }
+        }
+    }
+
     void send(void)
     {
         if (image_msg_ && publisher_)
@@ -71,14 +163,24 @@ class GPUSender
         {
             publisher_->publish(disp_msg_);
         }
+        if (points_msg_ && publisher_)
+        {
+            fillInPointMessage();
+            publisher_->publish(points_msg_);
+        }
     }
 
-    void enqueueSend(cv::cuda::GpuMat &m, cv::cuda::Stream &strm)
+    void enqueueSend(cv::cuda::GpuMat &m, cv::cuda::GpuMat &col, cv::cuda::Stream &strm)
     {
-        auto vptr = (void*)&cpu_data_.data[0];
+        // cpu_data_ should be constructed in such a way that it does not require resize
+        auto vptr = (void *)&cpu_data_.data[0];
         m.download(cpu_data_, strm);
-        //cpu_data_ should be constructed in such a way that it does not require resize
-        assert(vptr == (void*)&cpu_data_.data[0]);
+        assert(vptr == (void *)&cpu_data_.data[0]);
+
+        vptr = (void *)&cpu_color_data_.data[0];
+        col.download(cpu_color_data_, strm);
+        assert(vptr == (void *)&cpu_color_data_.data[0]);
+
         strm.enqueueHostCallback(
             [](int status, void *userData) {
                 (void)status;
@@ -86,17 +188,32 @@ class GPUSender
             },
             (void *)this);
     }
-    cv::Mat& getCpuData()
+
+    void enqueueSend(cv::cuda::GpuMat &m, cv::cuda::Stream &strm)
     {
-        return cpu_data_;
+        auto vptr = (void *)&cpu_data_.data[0];
+        m.download(cpu_data_, strm);
+        // cpu_data_ should be constructed in such a way that it does not require resize
+        assert(vptr == (void *)&cpu_data_.data[0]);
+        strm.enqueueHostCallback(
+            [](int status, void *userData) {
+                (void)status;
+                static_cast<GPUSender *>(userData)->send();
+            },
+            (void *)this);
     }
+
+    cv::Mat &getCpuData() { return cpu_data_; }
 
     typedef boost::shared_ptr<GPUSender> Ptr;
 
   private:
+    static const int STEP   = 16;
     sensor_msgs::ImagePtr image_msg_;
     stereo_msgs::DisparityImagePtr disp_msg_;
+    sensor_msgs::PointCloud2Ptr points_msg_;
     cv::Mat cpu_data_;
+    cv::Mat cpu_color_data_;
     ros::Publisher *publisher_;
 };
 } // namespace

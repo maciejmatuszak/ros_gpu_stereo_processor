@@ -27,7 +27,9 @@ enum GpuMatSource
     GPU_MAT_SRC_RECT_COLOR    = 1 << 6,
     GPU_MAT_SRC_DISPARITY     = 1 << 7,
     GPU_MAT_SRC_DISPARITY_32F = 1 << 8,
-    GPU_MAT_SRC_MASK = GPU_MAT_SRC_RAW | GPU_MAT_SRC_MONO | GPU_MAT_SRC_COLOR | GPU_MAT_SRC_RECT_MONO | GPU_MAT_SRC_RECT_COLOR | GPU_MAT_SRC_DISPARITY | GPU_MAT_SRC_DISPARITY_32F,
+    GPU_MAT_SRC_POINTS2       = 1 << 9,
+    GPU_MAT_SRC_MASK = GPU_MAT_SRC_RAW | GPU_MAT_SRC_MONO | GPU_MAT_SRC_COLOR | GPU_MAT_SRC_RECT_MONO | GPU_MAT_SRC_RECT_COLOR | GPU_MAT_SRC_DISPARITY | GPU_MAT_SRC_DISPARITY_32F |
+                       GPU_MAT_SRC_POINTS2,
 
     GPU_MAT_SRC_L_RAW           = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_L,
     GPU_MAT_SRC_R_RAW           = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_R,
@@ -42,7 +44,9 @@ enum GpuMatSource
     GPU_MAT_SRC_L_DISPARITY     = GPU_MAT_SRC_DISPARITY | GPU_MAT_SIDE_L,
     GPU_MAT_SRC_R_DISPARITY     = GPU_MAT_SRC_DISPARITY | GPU_MAT_SIDE_R,
     GPU_MAT_SRC_L_DISPARITY_32F = GPU_MAT_SRC_DISPARITY_32F | GPU_MAT_SIDE_L,
-    GPU_MAT_SRC_R_DISPARITY_32F = GPU_MAT_SRC_DISPARITY_32F | GPU_MAT_SIDE_R
+    GPU_MAT_SRC_R_DISPARITY_32F = GPU_MAT_SRC_DISPARITY_32F | GPU_MAT_SIDE_R,
+    GPU_MAT_SRC_L_POINTS2       = GPU_MAT_SRC_POINTS2 | GPU_MAT_SIDE_L,
+    GPU_MAT_SRC_R_POINTS2       = GPU_MAT_SRC_POINTS2 | GPU_MAT_SIDE_R
 };
 
 inline GpuMatSource operator&(GpuMatSource a, GpuMatSource b) { return static_cast<GpuMatSource>(static_cast<int>(a) & static_cast<int>(b)); }
@@ -65,11 +69,13 @@ class GpuStereoProcessor
     void convertColor(GpuMatSource mat_source, GpuMatSource mat_dst, const std::string &src_encoding, const std::string &dst_encoding);
     GPUSender::Ptr enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub);
     GPUSender::Ptr enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
+    GPUSender::Ptr enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
     void computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity);
+    void projectDisparityTo3DPoints(GpuMatSource disparity_src, GpuMatSource points_src);
     void waitForStream(GpuMatSource stream_source);
     void waitForAllStreams();
     void cleanSenders();

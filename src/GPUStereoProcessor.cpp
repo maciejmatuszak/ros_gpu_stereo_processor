@@ -1,4 +1,4 @@
-#include "gpuimageproc/GPUStereoProcessor.h".h"
+#include "gpuimageproc/GPUStereoProcessor.h"
 #include <camera_calibration_parsers/parse.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -201,6 +201,14 @@ GPUSender::Ptr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, con
     return t;
 }
 
+GPUSender::Ptr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
+{
+    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern, pub);
+    senders.push_back(t);
+    t->enqueueSend(*getGpuMat(points_source), *getGpuMat(color_source), getStream(points_source));
+    return t;
+}
+
 void GpuStereoProcessor::rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation)
 {
     assert(model_.initialized());
@@ -247,6 +255,16 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     assert((disparity & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L);
 
     getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
+}
+
+void GpuStereoProcessor::projectDisparityTo3DPoints(GpuMatSource disparity_src, GpuMatSource points_src)
+{
+    assert(model_.initialized());
+    model_.projectDisparityImageTo3dGPU(*getGpuMat(disparity_src), /* disparity gpu mat */
+                                        *getGpuMat(points_src),    /* points gpu mat */
+                                        true,                      /* handle missing points */
+                                        getStream(disparity_src)   /* gpu stream */
+                                        );
 }
 
 void GpuStereoProcessor::computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity)
