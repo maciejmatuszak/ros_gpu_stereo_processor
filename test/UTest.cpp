@@ -271,12 +271,14 @@ TEST_F(CudaStereoBMTf, DisparityGpu)
     std_msgs::Header mh;
     auto img    = cv_bridge::CvImage(mh, sensor_msgs::image_encodings::MONO8, l_raw_).toImageMsg();
     auto sender = stereo_processor_.enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY_32F, img, (ros::Publisher *)NULL);
-    stereo_processor_.waitForAllStreams();
 
     stereo_processor_.downloadMat(GPU_MAT_SRC_L_RECT_MONO, l_rect_gpu);
     stereo_processor_.downloadMat(GPU_MAT_SRC_R_RECT_MONO, r_rect_gpu);
     stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, disparity_gpu_cv_8u);
+
     stereo_processor_.computeDisparity(l_rect_gpu, r_rect_gpu, disparity_cpu);
+
+    stereo_processor_.waitForAllStreams();
 
     stereo_processor_.rectifyImageLeft(l_raw_, l_rect_cpu, cv::INTER_LINEAR);
     stereo_processor_.rectifyImageRight(r_raw_, r_rect_cpu, cv::INTER_LINEAR);
@@ -287,13 +289,49 @@ TEST_F(CudaStereoBMTf, DisparityGpu)
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_r_rect_cpu.png").string(), r_rect_cpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_rect_gpu.png").string(), l_rect_gpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_r_rect_gpu.png").string(), r_rect_gpu);
-    cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu.png").string(), sender->getCpuData());
+    assert(sender->wasDataSent());
+    cv::Mat disp_gpu = sender->getCpuData();
+    cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu.png").string(), disp_gpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu_8u.png").string(), disparity_gpu_cv_8u);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_cpu.png").string(), disparity_cpu);
     // ASSERT_TRUE(mat_are_same(l_rect, l_rect_));
     // ASSERT_TRUE(mat_are_same(r_rect, r_rect_));
 }
 
+TEST_F(CudaStereoBMTf, PointCloud)
+{
+    loadImagesKitchen();
+    initStereoModelKitchen();
+    stereo_processor_.uploadMat(GPU_MAT_SRC_L_RAW, l_raw_, sensor_msgs::image_encodings::MONO8);
+    stereo_processor_.uploadMat(GPU_MAT_SRC_R_RAW, r_raw_, sensor_msgs::image_encodings::MONO8);
+    stereo_processor_.convertRawToColor(GPU_MAT_SIDE_L);
+
+    stereo_processor_.rectifyImage(GPU_MAT_SRC_L_COLOR, GPU_MAT_SRC_L_RECT_COLOR, cv::INTER_LINEAR);
+    stereo_processor_.rectifyImage(GPU_MAT_SRC_L_RAW, GPU_MAT_SRC_L_RECT_MONO, cv::INTER_LINEAR);
+    stereo_processor_.rectifyImage(GPU_MAT_SRC_R_RAW, GPU_MAT_SRC_R_RECT_MONO, cv::INTER_LINEAR);
+
+    stereo_processor_.computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
+    stereo_processor_.projectDisparityTo3DPoints(GPU_MAT_SRC_L_DISPARITY_32F, GPU_MAT_SRC_L_POINTS2);
+
+    std_msgs::Header mh;
+    auto img    = cv_bridge::CvImage(mh, sensor_msgs::image_encodings::MONO8, l_raw_).toImageMsg();
+    auto sender = stereo_processor_.enqueueSendPoints(GPU_MAT_SRC_L_POINTS2, GPU_MAT_SRC_L_RECT_COLOR, img, (ros::Publisher *)NULL);
+
+    cv::Mat l_rect_gpu, r_rect_gpu, l_disparity_8U, l_disparity_32F, l_points;
+
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_RECT_MONO, l_rect_gpu);
+    stereo_processor_.downloadMat(GPU_MAT_SRC_R_RECT_MONO, r_rect_gpu);
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, l_disparity_8U);
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY_32F, l_disparity_32F);
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_POINTS2, l_points);
+    const cv::Mat_<cv::Vec3f> points(l_points);
+
+    stereo_processor_.waitForAllStreams();
+    auto point_msgPtr = sender->getPointsMessage();
+    ROS_INFO("POINTS:%d", point_msgPtr->height);
+
+    cv::imshow("Disparity", l_disparity_8U);
+}
 void handler(int sig)
 {
     void *array[10];

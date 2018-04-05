@@ -17,8 +17,8 @@ StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_n
     , private_nh(private_nh)
 {
     stereoProcessor_        = boost::make_shared<GpuStereoProcessor>();
-    camera_info_file_left_  = "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/left.yaml";
-    camera_info_file_right_ = "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/right.yaml";
+    camera_info_file_left_  = "";
+    camera_info_file_right_ = "";
 
     it_.reset(new image_transport::ImageTransport(nh));
 
@@ -124,13 +124,13 @@ void StereoProcessor::connectCb()
         /// @todo Allow remapping left, right?
         image_transport::TransportHints hints("raw", ros::TransportHints(), private_nh);
         ROS_INFO("Subscribing to raw images");
-        sub_l_raw_image_.subscribe(*it_, "left/image_raw", 1, hints);
-        sub_r_raw_image_.subscribe(*it_, "right/image_raw", 1, hints);
+        sub_l_raw_image_.subscribe(*it_, "camera/left/image_raw", 1, hints);
+        sub_r_raw_image_.subscribe(*it_, "camera/right/image_raw", 1, hints);
         if (!camera_info_from_files_)
         {
             ROS_INFO("Subscribing to camera infos");
-            sub_l_info_.subscribe(nh, "left/camera_info", 1);
-            sub_r_info_.subscribe(nh, "right/camera_info", 1);
+            sub_l_info_.subscribe(nh, "camera/left/camera_info", 1);
+            sub_r_info_.subscribe(nh, "camera/right/camera_info", 1);
         }
     }
 }

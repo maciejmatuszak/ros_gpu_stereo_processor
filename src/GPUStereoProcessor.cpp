@@ -203,7 +203,7 @@ GPUSender::Ptr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, con
 
 GPUSender::Ptr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
-    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern, pub);
+    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern->header, pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(points_source), *getGpuMat(color_source), getStream(points_source));
     return t;

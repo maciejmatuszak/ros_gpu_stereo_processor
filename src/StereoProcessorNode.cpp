@@ -1,5 +1,5 @@
-#include <ros/ros.h>
 #include "gpuimageproc/StereoProcessor.h"
+#include <ros/ros.h>
 
 int main(int argc, char **argv)
 {
@@ -22,6 +22,12 @@ int main(int argc, char **argv)
      */
     ros::NodeHandle nh;
     ros::NodeHandle private_nh("~");
+
+    if (true)
+    {
+        private_nh.setParam("camera_info_file_left", "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/left.yaml");
+        private_nh.setParam("camera_info_file_right", "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/right.yaml");
+    }
 
     gpuimageproc::StereoProcessor processor(nh, private_nh);
     ros::spin();

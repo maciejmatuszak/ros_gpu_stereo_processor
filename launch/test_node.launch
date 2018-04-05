@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <arg name="bagfile" default="/data/Download/euroc_calib/cam_checkerboard.bag"/>
+    <arg name="bagfile" default="/data/rosbag/mission_2018-03-08-16-58-51_rewrite.bag"/>
 
     <param name="use_sim_time2" type="bool" value="true"/>
 
@@ -9,10 +9,13 @@
         pkg="rosbag"
         type="play"
         name="replay"
-        args=" --clock --loop
-            --topics /cam0/image_raw
-                     /cam1/image_raw
-                     /tf
+        args="/loitor_stereo_visensor/left/image_raw:=/left/image_raw
+            /loitor_stereo_visensor/right/image_raw:=/right/image_raw
+            --clock
+            --loop
+            --topics
+                /loitor_stereo_visensor/left/image_raw
+                /loitor_stereo_visensor/right/image_raw
             --bags $(arg bagfile)"
         output="screen">
      </node>

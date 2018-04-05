@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
+<launch>
+    <arg name="bagfile" default="/data/rosbag/mission_2018-03-08-16-58-51_rewrite.bag"/>
+
+    <param name="use_sim_time2" type="bool" value="true"/>
+
+    <node
+        pkg="rosbag"
+        type="play"
+        name="replay"
+        args="
+            /loitor_stereo_visensor/left/image_raw:=/camera/left/image_raw
+            /loitor_stereo_visensor/right/image_raw:=/camera/right/image_raw
+            /loitor_stereo_visensor/left/camera_info:=/camera/left/camera_info
+            /loitor_stereo_visensor/right/camera_info:=/camera/right/camera_info
+            --clock
+            --loop
+            --topics
+                /loitor_stereo_visensor/left/image_raw
+                /loitor_stereo_visensor/right/image_raw
+                /loitor_stereo_visensor/left/camera_info
+                /loitor_stereo_visensor/right/camera_info
+            --bags $(arg bagfile)"
+        output="screen">
+     </node>
+
+    <node
+        pkg="image_view"
+        type="stereo_view"
+        name="stereo_view"
+        output="screen"
+        >
+        <remap to="/gpuimageproc" from="stereo"/>
+        <remap to="rect_mono" from="image"/>
+    </node>
+    <node
+        pkg="stereo_image_proc"
+        type="stereo_image_proc"
+        name="stereo_ros"
+        ns="/camera"
+        args=""
+        output="screen"
+    >
+    </node>
+    <node name="tf_world_map" pkg="tf2_ros" type="static_transform_publisher" args="0 0 0 0 0 0 world loitor" />
+</launch>
