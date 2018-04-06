@@ -27,9 +27,10 @@ enum GpuMatSource
     GPU_MAT_SRC_RECT_COLOR    = 1 << 6,
     GPU_MAT_SRC_DISPARITY     = 1 << 7,
     GPU_MAT_SRC_DISPARITY_32F = 1 << 8,
-    GPU_MAT_SRC_POINTS2       = 1 << 9,
+    GPU_MAT_SRC_DISPARITY_IMG = 1 << 9,
+    GPU_MAT_SRC_POINTS2       = 1 << 10,
     GPU_MAT_SRC_MASK = GPU_MAT_SRC_RAW | GPU_MAT_SRC_MONO | GPU_MAT_SRC_COLOR | GPU_MAT_SRC_RECT_MONO | GPU_MAT_SRC_RECT_COLOR | GPU_MAT_SRC_DISPARITY | GPU_MAT_SRC_DISPARITY_32F |
-                       GPU_MAT_SRC_POINTS2,
+                       GPU_MAT_SRC_DISPARITY_IMG | GPU_MAT_SRC_POINTS2,
 
     GPU_MAT_SRC_L_RAW           = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_L,
     GPU_MAT_SRC_R_RAW           = GPU_MAT_SRC_RAW | GPU_MAT_SIDE_R,
@@ -45,6 +46,8 @@ enum GpuMatSource
     GPU_MAT_SRC_R_DISPARITY     = GPU_MAT_SRC_DISPARITY | GPU_MAT_SIDE_R,
     GPU_MAT_SRC_L_DISPARITY_32F = GPU_MAT_SRC_DISPARITY_32F | GPU_MAT_SIDE_L,
     GPU_MAT_SRC_R_DISPARITY_32F = GPU_MAT_SRC_DISPARITY_32F | GPU_MAT_SIDE_R,
+    GPU_MAT_SRC_L_DISPARITY_IMG = GPU_MAT_SRC_DISPARITY_IMG | GPU_MAT_SIDE_L,
+    GPU_MAT_SRC_R_DISPARITY_IMG = GPU_MAT_SRC_DISPARITY_IMG | GPU_MAT_SIDE_R,
     GPU_MAT_SRC_L_POINTS2       = GPU_MAT_SRC_POINTS2 | GPU_MAT_SIDE_L,
     GPU_MAT_SRC_R_POINTS2       = GPU_MAT_SRC_POINTS2 | GPU_MAT_SIDE_R
 };
@@ -74,6 +77,7 @@ class GpuStereoProcessor
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
+    void computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest);
     void computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity);
     void projectDisparityTo3DPoints(GpuMatSource disparity_src, GpuMatSource points_src);
     void waitForStream(GpuMatSource stream_source);

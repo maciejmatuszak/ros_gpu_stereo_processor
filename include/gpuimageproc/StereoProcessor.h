@@ -16,8 +16,8 @@
 #include <sensor_msgs/Image.h>
 #include <stereo_msgs/DisparityImage.h>
 
-#include "gpuimageproc/GPUConfig.h"
 #include "gpuimageproc/ConnectedTopics.h"
+#include "gpuimageproc/GPUConfig.h"
 #include "gpuimageproc/GPUStereoProcessor.h"
 
 namespace gpuimageproc
@@ -26,6 +26,11 @@ class StereoProcessor
 {
 
   public:
+    const static std::string CAMERA_TOPIC_LEFT;
+    const static std::string CAMERA_TOPIC_RIGHT;
+    const static std::string CAMERA_TOPIC_IMAGE;
+    const static std::string CAMERA_TOPIC_INFO;
+
     StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_nh);
 
   protected:

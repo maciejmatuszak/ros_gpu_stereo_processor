@@ -15,6 +15,7 @@ namespace gpuimageproc
 class GPUSender
 {
   public:
+    //Create for points2
     GPUSender(const std_msgs::Header& header, ros::Publisher *pub)
         : publisher_(pub)
         , data_sent(false)
@@ -23,6 +24,7 @@ class GPUSender
         points2_msg_ = boost::make_shared<sensor_msgs::PointCloud2>();
     }
 
+    //Create for image
     GPUSender(sensor_msgs::ImageConstPtr example, std::string encoding, ros::Publisher *pub)
         : publisher_(pub)
         , data_sent(false)
@@ -41,7 +43,8 @@ class GPUSender
         cv::cuda::registerPageLocked(cpu_data_);
     }
 
-    GPUSender(sensor_msgs::ImageConstPtr example, int blockSize, int numDisparities, int minDisparity, ros::Publisher *pub)
+    //create for Disparity message
+    GPUSender(sensor_msgs::ImageConstPtr example, int blockSize, int numDisparities, int minDisparity, double fx, double baseline, ros::Publisher *pub)
         : publisher_(pub)
         , data_sent(false)
     {
@@ -62,6 +65,8 @@ class GPUSender
         disp_msg_->valid_window.height   = bottom - top;
         disp_msg_->min_disparity         = minDisparity + 1;
         disp_msg_->max_disparity         = minDisparity + numDisparities - 1;
+        disp_msg_->f = fx;
+        disp_msg_->T = baseline;
 
         disp_msg_->image.height   = example->height;
         disp_msg_->image.width    = example->width;

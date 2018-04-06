@@ -12,6 +12,11 @@
 namespace gpuimageproc
 {
 
+const std::string StereoProcessor::CAMERA_TOPIC_LEFT  = "left";
+const std::string StereoProcessor::CAMERA_TOPIC_RIGHT = "right";
+const std::string StereoProcessor::CAMERA_TOPIC_IMAGE = "/image_raw";
+const std::string StereoProcessor::CAMERA_TOPIC_INFO  = "/camera_info";
+
 StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
     : nh(nh)
     , private_nh(private_nh)
@@ -124,13 +129,13 @@ void StereoProcessor::connectCb()
         /// @todo Allow remapping left, right?
         image_transport::TransportHints hints("raw", ros::TransportHints(), private_nh);
         ROS_INFO("Subscribing to raw images");
-        sub_l_raw_image_.subscribe(*it_, "camera/left/image_raw", 1, hints);
-        sub_r_raw_image_.subscribe(*it_, "camera/right/image_raw", 1, hints);
+        sub_l_raw_image_.subscribe(*it_, CAMERA_TOPIC_LEFT + CAMERA_TOPIC_IMAGE, 1, hints);
+        sub_r_raw_image_.subscribe(*it_, CAMERA_TOPIC_RIGHT + CAMERA_TOPIC_IMAGE, 1, hints);
         if (!camera_info_from_files_)
         {
             ROS_INFO("Subscribing to camera infos");
-            sub_l_info_.subscribe(nh, "camera/left/camera_info", 1);
-            sub_r_info_.subscribe(nh, "camera/right/camera_info", 1);
+            sub_l_info_.subscribe(nh, CAMERA_TOPIC_LEFT + CAMERA_TOPIC_INFO, 1);
+            sub_r_info_.subscribe(nh, CAMERA_TOPIC_RIGHT + CAMERA_TOPIC_INFO, 1);
         }
     }
 }
@@ -261,7 +266,8 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DisparityVis)
     {
-        // TODO
+        stereoProcessor_->computeDisparityImage(GPU_MAT_SRC_L_DISPARITY, GPU_MAT_SRC_L_DISPARITY_IMG);
+        stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_DISPARITY_IMG, l_raw_msg, sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_);
     }
 
     if (connected_.Pointcloud)

@@ -9,13 +9,14 @@
         pkg="rosbag"
         type="play"
         name="replay"
-        args="/loitor_stereo_visensor/left/image_raw:=/left/image_raw
-            /loitor_stereo_visensor/right/image_raw:=/right/image_raw
+        args="
             --clock
             --loop
             --topics
-                /loitor_stereo_visensor/left/image_raw
-                /loitor_stereo_visensor/right/image_raw
+            /loitor_stereo_visensor/left/image_raw
+            /loitor_stereo_visensor/right/image_raw
+            /loitor_stereo_visensor/left/camera_info
+            /loitor_stereo_visensor/right/camera_info
             --bags $(arg bagfile)"
         output="screen">
      </node>
@@ -24,20 +25,27 @@
         pkg="gpuimageproc"
         type="gpuimageproc_node"
         name="stereo_cuda"
-        ns="stereo_cuda"
         output="screen"
         >
-        <remap to="/cam0/image_raw"
-               from="left/image_raw"/>
-        <remap to="/cam1/image_raw"
-               from="right/image_raw"/>
-        <remap to="/loitor_stereo_visensor/left/camera_info"
-               from="left/camera_info"/>
-        <remap to="/loitor_stereo_visensor/right/camera_info"
-               from="right/camera_info"/>
+        <remap to="/loitor_stereo_visensor/left/image_raw" from="left/image_raw"/>
+        <remap to="/loitor_stereo_visensor/right/image_raw" from="right/image_raw"/>
+        <remap to="/loitor_stereo_visensor/left/camera_info" from="left/camera_info"/>
+        <remap to="/loitor_stereo_visensor/right/camera_info" from="right/camera_info"/>
 
         <param name="approximate_sync" type="bool" value="false"/>
         <param name="camera_info_file_left" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_left_scale_0.yaml"/>
         <param name="camera_info_file_right" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_right_scale_0.yaml"/>
     </node>
+
+    <arg name="pi/2" value="1.5707963267948966" />
+    <!-- http://wiki.ros.org/robot_localization/Tutorials/Preparing%20Your%20Sensor%20Data -->
+    <!-- http://www.ros.org/reps/rep-0103.html -->
+    <!-- http://www.ros.org/reps/rep-0105.html -->
+    <!-- map ==> odom ==> base_footprint ==> base_stabilized ==> base_link => <sensor> -->
+    <!-- http://wiki.ros.org/hector_slam/Tutorials/SettingUpForYourRobot -->
+    <!--                                                                     x forward, y left, z up -->
+    <!--                 static_transform_publisher                                   x y z yaw pitch roll frame_id child_frame_id period_in_ms -->
+    <!--                 static_transform_publisher                                   x y z qx qy qz qw frame_id child_frame_id  period_in_ms -->
+
+    <node name="tf_world_map" pkg="tf2_ros" type="static_transform_publisher" args="0 0 2 -$(arg pi/2) 0 -$(arg pi/2) world loitor" />
 </launch>

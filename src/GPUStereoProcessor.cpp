@@ -194,8 +194,8 @@ GPUSender::Ptr GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const s
 
 GPUSender::Ptr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
-    GPUSender::Ptr t =
-        boost::make_shared<GPUSender>(imagePattern, block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(), block_matcher_gpu_->getMinDisparity(), pub);
+    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern, block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(), model_.right().fx(),
+                                                     model_.baseline(), block_matcher_gpu_->getMinDisparity(), pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(source), getStream(source));
     return t;
@@ -257,6 +257,14 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
 }
 
+void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest)
+{
+    assert(model_.initialized());
+    auto disparity = getGpuMat(disparity_src);
+    auto image     = getGpuMat(disp_image_dest);
+    auto ndisp     = block_matcher_gpu_->getNumDisparities();
+    cv::cuda::drawColorDisp(*disparity, *image, ndisp, getStream(disparity_src));
+}
 void GpuStereoProcessor::projectDisparityTo3DPoints(GpuMatSource disparity_src, GpuMatSource points_src)
 {
     assert(model_.initialized());
