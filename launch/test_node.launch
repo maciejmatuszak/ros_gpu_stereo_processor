@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <!-- vim: set fenc=utf-8 et sts=4 ft=xml : -->
 <launch>
-    <arg name="bagfile" default="/data/rosbag/mission_2018-03-08-16-58-51_rewrite.bag"/>
+    <arg name="bagfile" default="/data/rosbag/depth_sample.bag"/>
 
-    <param name="use_sim_time2" type="bool" value="true"/>
+    <param name="use_sim_time" type="bool" value="true"/>
 
     <node
         pkg="rosbag"
         type="play"
-        name="replay"
+        name="rosbagplay"
         args="
             --clock
             --loop
@@ -19,6 +19,23 @@
             /loitor_stereo_visensor/right/camera_info
             --bags $(arg bagfile)"
         output="screen">
+     </node>
+     <node
+         pkg="rviz"
+         type="rviz"
+         name="rviz"
+         args="
+             -d $(find gpuimageproc)/launch/rviz.rviz"
+         output="screen">
+      </node>
+     <node
+         pkg="stereo_image_proc"
+         type="stereo_image_proc"
+         name="stereo_ros"
+         ns="/loitor_stereo_visensor"
+         args=""
+         output="screen"
+     >
      </node>
 
     <node
@@ -33,8 +50,8 @@
         <remap to="/loitor_stereo_visensor/right/camera_info" from="right/camera_info"/>
 
         <param name="approximate_sync" type="bool" value="false"/>
-        <param name="camera_info_file_left" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_left_scale_0.yaml"/>
-        <param name="camera_info_file_right" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_right_scale_0.yaml"/>
+        <!-- param name="camera_info_file_left" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_left_scale_0.yaml"/ -->
+        <!-- param name="camera_info_file_right" type="str" value="/data/git/temp_ws/src/gpuimageproc/test/stereobm/euroc_right_scale_0.yaml"/ -->
     </node>
 
     <arg name="pi/2" value="1.5707963267948966" />

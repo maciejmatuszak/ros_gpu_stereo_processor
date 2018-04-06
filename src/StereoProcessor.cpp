@@ -266,7 +266,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DisparityVis)
     {
-        stereoProcessor_->computeDisparityImage(GPU_MAT_SRC_L_DISPARITY, GPU_MAT_SRC_L_DISPARITY_IMG);
+        stereoProcessor_->computeDisparityImage(GPU_MAT_SRC_L_DISPARITY_32F, GPU_MAT_SRC_L_DISPARITY_IMG);
         stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_DISPARITY_IMG, l_raw_msg, sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_);
     }
 

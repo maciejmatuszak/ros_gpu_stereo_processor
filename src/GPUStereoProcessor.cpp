@@ -241,8 +241,6 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     static const int DPP        = 16; // disparities per pixel
     static const double inv_dpp = 1.0 / DPP;
 
-    getStream(static_cast<GpuMatSource>(disparity ^ GPU_MAT_SIDE_MASK)).waitForCompletion();
-
     // Block matcher produces 16-bit signed (fixed point) disparity image
     auto lgpu = getGpuMat(left);
     auto rgpu = getGpuMat(right);
@@ -254,7 +252,8 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     // TODO:the x offset will be different for right side for now just use assert to prevent the use of Right disparity
     assert((disparity & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L);
 
-    getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
+    //getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
+    getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, 1, -(model_.left().cx() - model_.right().cx()));
 }
 
 void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest)
