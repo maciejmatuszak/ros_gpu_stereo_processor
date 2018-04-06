@@ -278,7 +278,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     stereoProcessor_->waitForAllStreams();
     double duration = perf_timer.elapsed();
-    ROS_INFO("Image Callback took: %.2f [ms]", duration * 1000.0);
+    ROS_DEBUG("Image Callback took: %.2f [ms]", duration * 1000.0);
     cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(l_cpu_raw->image));
     cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(r_cpu_raw->image));
 }

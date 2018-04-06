@@ -246,7 +246,6 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     auto rgpu    = getGpuMat(right);
     auto dgpu    = getGpuMat(disparity);
     double shift = -(model_.left().cx() - model_.right().cx());
-    ROS_INFO("model Left Cx:%f; Right Cx:%f; baseline:%f", model_.left().cx(), model_.right().cx(), model_.baseline());
     GpuMatSource disparity_f32 = static_cast<GpuMatSource>((disparity & GPU_MAT_SIDE_MASK) | GPU_MAT_SRC_DISPARITY_32F);
     auto dgpu32                = getGpuMat(disparity_f32);
 
@@ -256,15 +255,15 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     // TODO:the x offset will be different for right side for now just use assert to prevent the use of Right disparity
     assert((disparity & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L);
 
-    cv::Mat disp;
-    dgpu->download(disp);
-    printStats("Disparity clean", disp);
+//    cv::Mat disp;
+//    dgpu->download(disp);
+//    printStats("Disparity clean", disp);
 
     dgpu->convertTo(*dgpu32, CV_32FC1, inv_dpp, shift);
     // dgpu->convertTo(*dgpu32, CV_32FC1, 1      , shift);
 
-    dgpu32->download(disp);
-    printStats("Disparity scaled", disp);
+//    dgpu32->download(disp);
+//    printStats("Disparity scaled", disp);
 }
 
 void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest)
@@ -350,7 +349,7 @@ void GpuStereoProcessor::printStats(std::string name, cv::Mat &mat)
     {
         cv::minMaxLoc(channels[i], &min, &max);
         auto mean_Val = cv::mean(channels[i])[0];
-        ROS_INFO("ARRAY STATS:%s; channel:%d; min:%f; max:%f; mean:%f;", name.c_str(), i, min, max, mean_Val);
+        ROS_DEBUG("ARRAY STATS:%s; channel:%d; min:%f; max:%f; mean:%f;", name.c_str(), i, min, max, mean_Val);
     }
 }
 
