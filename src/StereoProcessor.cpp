@@ -266,13 +266,13 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.DisparityVis)
     {
-        stereoProcessor_->computeDisparityImage(GPU_MAT_SRC_L_DISPARITY_32F, GPU_MAT_SRC_L_DISPARITY_IMG);
+        stereoProcessor_->computeDisparityImage(GPU_MAT_SRC_L_DISPARITY, GPU_MAT_SRC_L_DISPARITY_IMG);
         stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_DISPARITY_IMG, l_raw_msg, sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_);
     }
 
     if (connected_.Pointcloud)
     {
-        stereoProcessor_->projectDisparityTo3DPoints(GPU_MAT_SRC_L_DISPARITY_32F, GPU_MAT_SRC_L_POINTS2);
+        stereoProcessor_->projectDisparityTo3DPoints(GPU_MAT_SRC_L_DISPARITY, GPU_MAT_SRC_L_POINTS2);
         stereoProcessor_->enqueueSendPoints(GPU_MAT_SRC_L_POINTS2, GPU_MAT_SRC_L_RECT_COLOR, l_raw_msg, &pub_pointcloud_);
     }
 
@@ -306,6 +306,7 @@ void StereoProcessor::configCb(Config &config, uint32_t level)
     stereoProcessor_->setRefineDisparity(config.refine_disparity);
     stereoProcessor_->setBlockSize(config.correlation_window_size);
     stereoProcessor_->setNumDisparities(config.disparity_range);
+    stereoProcessor_->setMinDisparity(config.disparity_range);
     stereoProcessor_->setTextureThreshold(config.texture_threshold);
     ROS_INFO("Reconfigure winsz:%d ndisp:%d tex:%3.1f", config.correlation_window_size, config.disparity_range, config.texture_threshold);
 

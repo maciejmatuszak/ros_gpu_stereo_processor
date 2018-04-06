@@ -242,18 +242,29 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     static const double inv_dpp = 1.0 / DPP;
 
     // Block matcher produces 16-bit signed (fixed point) disparity image
-    auto lgpu = getGpuMat(left);
-    auto rgpu = getGpuMat(right);
-    auto dgpu = getGpuMat(disparity);
+    auto lgpu    = getGpuMat(left);
+    auto rgpu    = getGpuMat(right);
+    auto dgpu    = getGpuMat(disparity);
+    double shift = -(model_.left().cx() - model_.right().cx());
+    ROS_INFO("model Left Cx:%f; Right Cx:%f; baseline:%f", model_.left().cx(), model_.right().cx(), model_.baseline());
+    GpuMatSource disparity_f32 = static_cast<GpuMatSource>((disparity & GPU_MAT_SIDE_MASK) | GPU_MAT_SRC_DISPARITY_32F);
+    auto dgpu32                = getGpuMat(disparity_f32);
+
     block_matcher_gpu_->compute(*lgpu, *rgpu, *dgpu, getStream(disparity));
 
-    GpuMatSource disparity_f32 = static_cast<GpuMatSource>((disparity & GPU_MAT_SIDE_MASK) | GPU_MAT_SRC_DISPARITY_32F);
     //         side left or right \___________________________/    ^---plus disparity 32F selector
     // TODO:the x offset will be different for right side for now just use assert to prevent the use of Right disparity
     assert((disparity & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L);
 
-    //getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
-    getGpuMat(disparity)->convertTo(*getGpuMat(disparity_f32), CV_32FC1, 1, -(model_.left().cx() - model_.right().cx()));
+    cv::Mat disp;
+    dgpu->download(disp);
+    printStats("Disparity clean", disp);
+
+    dgpu->convertTo(*dgpu32, CV_32FC1, inv_dpp, shift);
+    // dgpu->convertTo(*dgpu32, CV_32FC1, 1      , shift);
+
+    dgpu32->download(disp);
+    printStats("Disparity scaled", disp);
 }
 
 void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest)
@@ -315,10 +326,32 @@ void GpuStereoProcessor::setNumDisparities(int numDisp)
     block_matcher_cpu_->setNumDisparities(numDisp);
 }
 
+void GpuStereoProcessor::setMinDisparity(int minDisp)
+{
+    block_matcher_gpu_->setMinDisparity(minDisp);
+    block_matcher_cpu_->setMinDisparity(minDisp);
+}
+
 void GpuStereoProcessor::setTextureThreshold(int threshold)
 {
     block_matcher_gpu_->setTextureThreshold(threshold);
     block_matcher_cpu_->setTextureThreshold(threshold);
+}
+
+void GpuStereoProcessor::printStats(std::string name, cv::Mat &mat)
+{
+    double min, max;
+
+    std::vector<cv::Mat> channels;
+    channels.resize(mat.channels());
+    cv::split(mat, channels);
+
+    for (int i = 0; i < channels.size(); ++i)
+    {
+        cv::minMaxLoc(channels[i], &min, &max);
+        auto mean_Val = cv::mean(channels[i])[0];
+        ROS_INFO("ARRAY STATS:%s; channel:%d; min:%f; max:%f; mean:%f;", name.c_str(), i, min, max, mean_Val);
+    }
 }
 
 } // namespace

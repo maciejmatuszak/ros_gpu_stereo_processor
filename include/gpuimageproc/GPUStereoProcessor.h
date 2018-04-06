@@ -87,7 +87,9 @@ class GpuStereoProcessor
     void setRefineDisparity(bool ref_disp);
     void setBlockSize(int block_size);
     void setNumDisparities(int numDisp);
+    void setMinDisparity(int minDisp);
     void setTextureThreshold(int threshold);
+    void printStats(std::string name, cv::Mat &mat);
 
   protected:
     boost::shared_ptr<cv::cuda::GpuMat> getGpuMat(GpuMatSource source);
