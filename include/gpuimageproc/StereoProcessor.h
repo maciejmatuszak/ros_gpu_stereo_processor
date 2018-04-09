@@ -106,9 +106,6 @@ class StereoProcessor
 
     void configCb(Config &config, uint32_t level);
 
-    void filterSpeckles(void);
     bool bilateral_filter_enabled_;
-    int maxSpeckleSize_;
-    double maxDiff_;
 };
 }

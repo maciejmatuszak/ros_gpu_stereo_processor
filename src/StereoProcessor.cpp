@@ -261,7 +261,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
 
     if (connected_.Disparity)
     {
-        stereoProcessor_->enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY_32F, l_raw_msg, &pub_disparity_);
+        stereoProcessor_->enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY, l_raw_msg, &pub_disparity_);
     }
 
     if (connected_.DisparityVis)
@@ -290,12 +290,6 @@ inline bool isValidPoint(const cv::Vec3f &pt)
     return pt[2] != image_geometry::StereoCameraModel::MISSING_Z && !std::isinf(pt[2]);
 }
 
-void StereoProcessor::filterSpeckles(void)
-{
-    cv::Mat disp = filter_buf_.createMatHeader();
-    cv::filterSpeckles(disp, 0, maxSpeckleSize_, maxDiff_ * 256);
-}
-
 void StereoProcessor::configCb(Config &config, uint32_t level)
 {
     // Tweak all settings to be valid
@@ -308,6 +302,9 @@ void StereoProcessor::configCb(Config &config, uint32_t level)
     stereoProcessor_->setNumDisparities(config.disparity_range);
     stereoProcessor_->setMinDisparity(config.disparity_range);
     stereoProcessor_->setTextureThreshold(config.texture_threshold);
+    stereoProcessor_->setMaxSpeckleDiff(config.max_speckle_diff);
+    stereoProcessor_->setMaxSpeckleSize(config.max_speckle_size);
+
     ROS_INFO("Reconfigure winsz:%d ndisp:%d tex:%3.1f", config.correlation_window_size, config.disparity_range, config.texture_threshold);
 
     //    if (bilateral_filter_.empty())
@@ -322,8 +319,6 @@ void StereoProcessor::configCb(Config &config, uint32_t level)
     //    bilateral_filter_->setMaxDiscThreshold(config.filter_max_disc_threshold);
     //    bilateral_filter_->setSigmaRange(config.filter_sigma_range);
     //    bilateral_filter_enabled_ = config.bilateral_filter;
-    //    maxDiff_                  = config.max_diff;
-    //    maxSpeckleSize_           = config.max_speckle_size;
 }
 
 } // namespace stereo_image_proc

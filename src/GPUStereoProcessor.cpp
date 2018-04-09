@@ -11,9 +11,9 @@ GpuStereoProcessor::GpuStereoProcessor()
 
 {
     // cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
-    block_matcher_gpu_ = cv::cuda::createStereoBM(128, 19);
+    block_matcher_gpu_ = cv::cuda::createStereoBM(48, 19);
     block_matcher_gpu_->setRefineDisparity(false);
-    block_matcher_cpu_ = cv::StereoBM::create(128, 19);
+    block_matcher_cpu_ = cv::StereoBM::create(48, 19);
 
     block_matcher_cpu_->setBlockSize(block_matcher_gpu_->getBlockSize());
     block_matcher_cpu_->setDisp12MaxDiff(block_matcher_gpu_->getDisp12MaxDiff());
@@ -184,26 +184,34 @@ cv::cuda::Stream &GpuStereoProcessor::getStream(GpuMatSource source)
     }
 }
 
-GPUSender::Ptr GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub)
+double GpuStereoProcessor::getMaxSpeckleDiff() const { return maxSpeckleDiff_; }
+
+void GpuStereoProcessor::setMaxSpeckleDiff(double maxSpeckleDiff) { maxSpeckleDiff_ = maxSpeckleDiff; }
+
+int GpuStereoProcessor::getMaxSpeckleSize() const { return maxSpeckleSize_; }
+
+void GpuStereoProcessor::setMaxSpeckleSize(int maxSpeckleSize) { maxSpeckleSize_ = maxSpeckleSize; }
+
+GPUSenderPtr GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub)
 {
-    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern, encoding, pub);
+    GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern, encoding, pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(source), getStream(source));
     return t;
 }
 
-GPUSender::Ptr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
+GPUSenderPtr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
-    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern, block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(), model_.right().fx(),
-                                                     model_.baseline(), block_matcher_gpu_->getMinDisparity(), pub);
+    GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern, block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(), model_.right().fx(),
+                                                   model_.baseline(), block_matcher_gpu_->getMinDisparity(), pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(source), getStream(source));
     return t;
 }
 
-GPUSender::Ptr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
+GPUSenderPtr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
-    GPUSender::Ptr t = boost::make_shared<GPUSender>(imagePattern->header, pub);
+    GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern->header, pub);
     senders.push_back(t);
     t->enqueueSend(*getGpuMat(points_source), *getGpuMat(color_source), getStream(points_source));
     return t;
@@ -246,6 +254,7 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     auto rgpu    = getGpuMat(right);
     auto dgpu    = getGpuMat(disparity);
     double shift = -(model_.left().cx() - model_.right().cx());
+
     GpuMatSource disparity_f32 = static_cast<GpuMatSource>((disparity & GPU_MAT_SIDE_MASK) | GPU_MAT_SRC_DISPARITY_32F);
     auto dgpu32                = getGpuMat(disparity_f32);
 
@@ -255,15 +264,15 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     // TODO:the x offset will be different for right side for now just use assert to prevent the use of Right disparity
     assert((disparity & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L);
 
-//    cv::Mat disp;
-//    dgpu->download(disp);
-//    printStats("Disparity clean", disp);
+    //    cv::Mat disp;
+    //    dgpu->download(disp);
+    //    printStats("Disparity clean", disp);
 
     dgpu->convertTo(*dgpu32, CV_32FC1, inv_dpp, shift);
     // dgpu->convertTo(*dgpu32, CV_32FC1, 1      , shift);
 
-//    dgpu32->download(disp);
-//    printStats("Disparity scaled", disp);
+    //    dgpu32->download(disp);
+    //    printStats("Disparity scaled", disp);
 }
 
 void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest)
@@ -276,11 +285,33 @@ void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMa
 }
 void GpuStereoProcessor::projectDisparityTo3DPoints(GpuMatSource disparity_src, GpuMatSource points_src)
 {
+
+    // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
+    static const double DPP        = 16.0; // disparities per pixel
+    static const double inv_dpp = 1.0 / DPP;
     assert(model_.initialized());
-    model_.projectDisparityImageTo3dGPU(*getGpuMat(disparity_src), /* disparity gpu mat */
-                                        *getGpuMat(points_src),    /* points gpu mat */
-                                        true,                      /* handle missing points */
-                                        getStream(disparity_src)   /* gpu stream */
+    double factor = 1.0;
+
+    auto disp_gpu = getGpuMat(disparity_src);
+    auto disp_gpu32F = getGpuMat(GPU_MAT_SRC_DISPARITY_32F);
+    auto strm = getStream(disparity_src);
+    if (maxSpeckleSize_ > 0)
+    {
+        disp_gpu->convertTo(*disp_gpu32F, CV_8UC1, 1, strm);
+
+        cv::Mat temp;
+        disp_gpu32F->download(temp);
+        filterSpeckles(temp);
+        disp_gpu->upload(temp, getStream(disparity_src));
+        factor = 1;
+    }
+
+    disp_gpu->convertTo(*disp_gpu32F,CV_32FC1,factor);
+
+    model_.projectDisparityImageTo3dGPU(*disp_gpu32F,               /* disparity gpu mat */
+                                        *getGpuMat(points_src),  /* points gpu mat */
+                                        true,                    /* handle missing points */
+                                        getStream(disparity_src) /* gpu stream */
                                         );
 }
 
@@ -301,6 +332,21 @@ void GpuStereoProcessor::waitForAllStreams()
 {
     l_strm.waitForCompletion();
     r_strm.waitForCompletion();
+}
+
+void GpuStereoProcessor::filterSpeckles(cv::Mat &disparity)
+{
+
+    // buvffer size calculations based on /data/git/opencv/modules/calib3d/src/stereosgbm.cpp:2291 filterSpecklesImpl function
+    int width      = disparity.cols;
+    int height     = disparity.rows;
+    int npixels    = width * height;
+    size_t bufSize = npixels * (int)(sizeof(cv::Point_<short>) + sizeof(int) + sizeof(uchar));
+    if (!_speclesBuf.isContinuous() || _speclesBuf.empty() || _speclesBuf.cols * _speclesBuf.rows * _speclesBuf.elemSize() < bufSize)
+    {
+        _speclesBuf.reserveBuffer(bufSize);
+    }
+    cv::filterSpeckles(disparity, 0, maxSpeckleSize_, maxSpeckleDiff_ * 256, _speclesBuf);
 }
 
 void GpuStereoProcessor::cleanSenders() { senders.clear(); }

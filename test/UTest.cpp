@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include <execinfo.h>
+#include <fstream>
 #include <iostream>
 #include <signal.h>
 
@@ -48,11 +49,37 @@ class CudaStereoBMTf : public testing::Test
         std::string path = (test_data_path / fileName).string();
         return cv::imread(path, flags);
     }
+
+    void writeCSV(std::string filename, cv::Mat &m)
+    {
+        std::ofstream myfile(filename);
+        myfile << cv::format(m, cv::Formatter::FMT_CSV);
+        myfile.close();
+    }
+
+    void writeMAT(std::string filename, cv::Mat &m)
+    {
+        std::ofstream myfile(filename);
+        myfile << cv::format(m, cv::Formatter::FMT_MATLAB);
+        myfile.close();
+    }
+
     void initStereoModelKitchen()
     {
         auto left_file  = (test_data_path / "stereobm/test_data/left.yaml").string();
         auto right_file = (test_data_path / "stereobm/test_data/right.yaml").string();
         stereo_processor_.initStereoModel(left_file, right_file);
+    }
+
+    void configureProcessor()
+    {
+        stereo_processor_.setBlockSize(11);
+        stereo_processor_.setMaxSpeckleSize(0);
+        stereo_processor_.setMinDisparity(0);
+        stereo_processor_.setNumDisparities(128);
+        stereo_processor_.setPreFilterType(0);
+        stereo_processor_.setRefineDisparity(0);
+        stereo_processor_.setTextureThreshold(0);
     }
 
     void loadImagesKitchen()
@@ -296,6 +323,38 @@ TEST_F(CudaStereoBMTf, DisparityGpu)
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_cpu.png").string(), disparity_cpu);
     // ASSERT_TRUE(mat_are_same(l_rect, l_rect_));
     // ASSERT_TRUE(mat_are_same(r_rect, r_rect_));
+}
+
+TEST_F(CudaStereoBMTf, ExportDisparitiesToCSV)
+{
+    loadImagesKitchen();
+    initStereoModelKitchen();
+    configureProcessor();
+
+    cv::Mat disparity_cpu, disparity_gpu;
+    cv::Mat l_rect_small, r_rect_small;
+    cv::Size dst_size = l_rect_.size();
+    double scale      = 200.0 / dst_size.width;
+    dst_size.width    = 200;
+    dst_size.height *= scale;
+
+    cv::resize(l_rect_, l_rect_small, dst_size, 0, 0, cv::INTER_AREA);
+    cv::resize(r_rect_, r_rect_small, dst_size, 0, 0, cv::INTER_AREA);
+    cv::imwrite((test_data_path / "stereobm/rect_l_small.png").string(), l_rect_small);
+    cv::imwrite((test_data_path / "stereobm/rect_r_small.png").string(), r_rect_small);
+
+    stereo_processor_.uploadMat(GPU_MAT_SRC_L_RECT_MONO, l_rect_small);
+    stereo_processor_.uploadMat(GPU_MAT_SRC_R_RECT_MONO, r_rect_small);
+
+    stereo_processor_.computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
+    stereo_processor_.computeDisparity(l_rect_small, r_rect_small, disparity_cpu);
+
+    stereo_processor_.downloadMat(GPU_MAT_SRC_L_DISPARITY, disparity_gpu);
+
+    writeCSV((test_data_path / "stereobm/disparity_gpu.csv").string(), disparity_gpu);
+    writeCSV((test_data_path / "stereobm/disparity_cpu.csv").string(), disparity_cpu);
+    writeMAT((test_data_path / "stereobm/disparity_gpu.mat").string(), disparity_gpu);
+    writeMAT((test_data_path / "stereobm/disparity_cpu.mat").string(), disparity_cpu);
 }
 
 TEST_F(CudaStereoBMTf, PointCloud)
