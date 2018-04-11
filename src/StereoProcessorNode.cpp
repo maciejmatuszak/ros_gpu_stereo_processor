@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nh;
     ros::NodeHandle private_nh("~");
 
-    if (true)
+    if (false)
     {
         private_nh.setParam("camera_info_file_left", "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/left.yaml");
         private_nh.setParam("camera_info_file_right", "/data/git/temp_ws/src/gpuimageproc/test/stereobm/test_data/right.yaml");
