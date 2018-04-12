@@ -10,7 +10,7 @@ GpuStereoProcessor::GpuStereoProcessor()
     , r_raw_encoding_("")
 
 {
-    // cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
+    cv::cuda::printShortCudaDeviceInfo(cv::cuda::getDevice());
     block_matcher_gpu_ = cv::cuda::createStereoBM(48, 19);
     block_matcher_gpu_->setRefineDisparity(false);
     block_matcher_cpu_ = cv::StereoBM::create(48, 19);
