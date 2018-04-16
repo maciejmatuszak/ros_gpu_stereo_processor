@@ -1,6 +1,7 @@
 #include "gpuimageproc/GPUStereoProcessor.h"
 #include "gpuimageproc/GpuSenderDisparity.h"
 #include "gpuimageproc/GpuSenderImage.h"
+#include "gpuimageproc/GpuSenderPc2.h"
 #include <camera_calibration_parsers/parse.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -216,9 +217,9 @@ GPUSenderIfcPtr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, co
 
 GPUSenderIfcPtr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
-    GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern->header, pub);
+    GPUSenderPc2Ptr t = boost::make_shared<GPUSenderPc2>(&imagePattern->header, pub, getHostMem(points_source), getHostMem(color_source));
     senders.push_back(t);
-    t->enqueueSend(*getGpuMat(points_source), *getGpuMat(color_source), getStream(points_source));
+    t->enqueueSend(getStream(points_source));
     return t;
 }
 

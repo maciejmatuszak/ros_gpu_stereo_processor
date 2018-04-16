@@ -108,6 +108,7 @@ add_library(${PROJECT_NAME}
     src/GpuSenderIfc.cpp
     src/GpuSenderImage.cpp
     src/GpuSenderDisparity.cpp
+    src/GpuSenderPc2.cpp
 
 )
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
