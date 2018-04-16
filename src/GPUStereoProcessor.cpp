@@ -1,4 +1,6 @@
 #include "gpuimageproc/GPUStereoProcessor.h"
+#include "gpuimageproc/GpuSenderDisparity.h"
+#include "gpuimageproc/GpuSenderImage.h"
 #include <camera_calibration_parsers/parse.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -80,8 +82,10 @@ void GpuStereoProcessor::convertRawToMono(GpuMatSource side)
 }
 void GpuStereoProcessor::uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat, std::string encoding)
 {
-    auto gmat = getGpuMat(mat_source);
-    gmat->upload(cv_mat, getStream(mat_source));
+    auto gmat = getHostMem(mat_source);
+    gmat->create(cv_mat.rows, cv_mat.cols, cv_mat.type());
+
+    cv_mat.copyTo(gmat->createMatHeader());
     if (encoding.empty())
     {
         return;
@@ -100,10 +104,10 @@ void GpuStereoProcessor::uploadMat(GpuMatSource mat_source, const cv::Mat &cv_ma
 
 void GpuStereoProcessor::downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat)
 {
-    auto gmat = getGpuMat(mat_source);
-    cv::cuda::createContinuous(gmat->size(), gmat->type(), cv_mat);
-    gmat->download(cv_mat, getStream(mat_source));
+    auto hMem = getHostMem(mat_source);
+    cv::cuda::createContinuous(hMem->size(), hMem->type(), cv_mat);
     getStream(mat_source).waitForCompletion();
+    hMem->createMatHeader().copyTo(cv_mat);
 }
 
 void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_dst, const std::string &src_encoding, const std::string &dst_encoding)
@@ -111,14 +115,14 @@ void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_
     assert(!src_encoding.empty());
     assert(!dst_encoding.empty());
     // Copy metadata
-    auto srcMat    = getGpuMat(mat_source);
-    auto dstMat    = getGpuMat(mat_dst);
+    auto srcMat    = getHostMem(mat_source);
+    auto dstMat    = getHostMem(mat_dst);
     auto srcStream = getStream(mat_source);
 
     // Copy to new buffer if same encoding requested
     if (dst_encoding.empty() || dst_encoding == src_encoding)
     {
-        srcMat->copyTo(*dstMat);
+        srcMat->createMatHeader().copyTo(dstMat->createMatHeader());
     }
     else
     {
@@ -139,11 +143,11 @@ void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_
 
             // Do scaling between CV_8U [0,255] and CV_16U [0,65535] images.
             if (src_depth == 8 && dst_depth == 16)
-                srcMat->convertTo(*dstMat, image2_type, 65535. / 255., srcStream);
+                srcMat->createGpuMatHeader().convertTo(dstMat->createGpuMatHeader(), image2_type, 65535. / 255., srcStream);
             else if (src_depth == 16 && dst_depth == 8)
-                srcMat->convertTo(*dstMat, image2_type, 255. / 65535., srcStream);
+                srcMat->createGpuMatHeader().convertTo(dstMat->createGpuMatHeader(), image2_type, 255. / 65535., srcStream);
             else
-                srcMat->convertTo(*dstMat, image2_type, srcStream);
+                srcMat->createGpuMatHeader().convertTo(dstMat->createGpuMatHeader(), image2_type, srcStream);
         }
         else
         {
@@ -156,14 +160,14 @@ void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_
     }
 }
 
-boost::shared_ptr<cv::cuda::GpuMat> GpuStereoProcessor::getGpuMat(GpuMatSource source)
+boost::shared_ptr<cv::cuda::HostMem> GpuStereoProcessor::getHostMem(GpuMatSource source)
 {
-    boost::shared_ptr<cv::cuda::GpuMat> gpuMat;
+    boost::shared_ptr<cv::cuda::HostMem> hMem;
     auto str_source = std::to_string(source);
     if (gpu_mats.find(str_source) == gpu_mats.end())
     {
-        gpuMat               = boost::make_shared<cv::cuda::GpuMat>();
-        gpu_mats[str_source] = gpuMat;
+        hMem                 = boost::make_shared<cv::cuda::HostMem>();
+        gpu_mats[str_source] = hMem;
         return gpu_mats[str_source];
     }
     else
@@ -192,24 +196,25 @@ int GpuStereoProcessor::getMaxSpeckleSize() const { return maxSpeckleSize_; }
 
 void GpuStereoProcessor::setMaxSpeckleSize(int maxSpeckleSize) { maxSpeckleSize_ = maxSpeckleSize; }
 
-GPUSenderPtr GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub)
+GPUSenderIfcPtr GpuStereoProcessor::enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub)
 {
-    GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern, encoding, pub);
+    GPUSenderImagePtr t = boost::make_shared<GPUSenderImage>(&imagePattern->header, pub, getHostMem(source), encoding);
     senders.push_back(t);
-    t->enqueueSend(*getGpuMat(source), getStream(source));
+    t->enqueueSend(getStream(source));
     return t;
 }
 
-GPUSenderPtr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
+GPUSenderIfcPtr GpuStereoProcessor::enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
-    GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern, block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(), model_.right().fx(),
-                                                   model_.baseline(), block_matcher_gpu_->getMinDisparity(), pub);
+    GPUSenderDisparityPtr t =
+        boost::make_shared<GPUSenderDisparity>(&imagePattern->header, pub, getHostMem(source), block_matcher_gpu_->getBlockSize(), block_matcher_gpu_->getNumDisparities(),
+                                               model_.right().fx(), model_.baseline(), block_matcher_gpu_->getMinDisparity());
     senders.push_back(t);
-    t->enqueueSend(*getGpuMat(source), getStream(source));
+    t->enqueueSend(getStream(source));
     return t;
 }
 
-GPUSenderPtr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
+GPUSenderIfcPtr GpuStereoProcessor::enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub)
 {
     GPUSenderPtr t = boost::make_shared<GPUSender>(this, imagePattern->header, pub);
     senders.push_back(t);
@@ -287,14 +292,14 @@ void GpuStereoProcessor::projectDisparityTo3DPoints(GpuMatSource disparity_src, 
 {
 
     // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
-    static const double DPP        = 16.0; // disparities per pixel
+    static const double DPP     = 16.0; // disparities per pixel
     static const double inv_dpp = 1.0 / DPP;
     assert(model_.initialized());
     double factor = 1.0;
 
-    auto disp_gpu = getGpuMat(disparity_src);
+    auto disp_gpu    = getGpuMat(disparity_src);
     auto disp_gpu32F = getGpuMat(GPU_MAT_SRC_DISPARITY_32F);
-    auto strm = getStream(disparity_src);
+    auto strm        = getStream(disparity_src);
     if (maxSpeckleSize_ > 0)
     {
         disp_gpu->convertTo(*disp_gpu32F, CV_8UC1, 1, strm);
@@ -306,9 +311,9 @@ void GpuStereoProcessor::projectDisparityTo3DPoints(GpuMatSource disparity_src, 
         factor = 1;
     }
 
-    disp_gpu->convertTo(*disp_gpu32F,CV_32FC1,factor);
+    disp_gpu->convertTo(*disp_gpu32F, CV_32FC1, factor);
 
-    model_.projectDisparityImageTo3dGPU(*disp_gpu32F,               /* disparity gpu mat */
+    model_.projectDisparityImageTo3dGPU(*disp_gpu32F,            /* disparity gpu mat */
                                         *getGpuMat(points_src),  /* points gpu mat */
                                         true,                    /* handle missing points */
                                         getStream(disparity_src) /* gpu stream */

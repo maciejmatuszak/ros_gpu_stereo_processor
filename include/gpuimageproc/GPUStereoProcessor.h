@@ -1,5 +1,5 @@
 #pragma once
-#include "gpuimageproc/GpuSender.h"
+#include "gpuimageproc/GpuSenderIfc.h"
 #include <ros/ros.h>
 #include <image_geometry/stereo_camera_model.h>
 #include <opencv2/core/cuda.hpp>
@@ -57,12 +57,8 @@ inline GpuMatSource operator&(GpuMatSource a, GpuMatSource b) { return static_ca
 
 inline GpuMatSource operator|(GpuMatSource a, GpuMatSource b) { return static_cast<GpuMatSource>(static_cast<int>(a) | static_cast<int>(b)); }
 
-class GPUSender;
-
 class GpuStereoProcessor
 {
-    typedef boost::shared_ptr<GPUSender> GPUSenderPtr;
-
   public:
     GpuStereoProcessor();
 
@@ -74,9 +70,9 @@ class GpuStereoProcessor
     void uploadMat(GpuMatSource mat_source, const cv::Mat &cv_mat, std::string encoding = "");
     void downloadMat(GpuMatSource mat_source, const cv::Mat &cv_mat);
     void convertColor(GpuMatSource mat_source, GpuMatSource mat_dst, const std::string &src_encoding, const std::string &dst_encoding);
-    GPUSenderPtr enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub);
-    GPUSenderPtr enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
-    GPUSenderPtr enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
+    GPUSenderIfcPtr enqueueSendImage(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, std::string encoding, ros::Publisher *pub);
+    GPUSenderIfcPtr enqueueSendDisparity(GpuMatSource source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
+    GPUSenderIfcPtr enqueueSendPoints(GpuMatSource points_source, GpuMatSource color_source, const sensor_msgs::ImageConstPtr &imagePattern, ros::Publisher *pub);
     void rectifyImage(GpuMatSource source, GpuMatSource dest, cv::InterpolationFlags interpolation);
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
@@ -103,12 +99,12 @@ class GpuStereoProcessor
     void setMaxSpeckleDiff(double maxSpeckleDiff);
 
 protected:
-    boost::shared_ptr<cv::cuda::GpuMat> getGpuMat(GpuMatSource source);
+    boost::shared_ptr<cv::cuda::HostMem> getHostMem(GpuMatSource source);
     cv::cuda::Stream &getStream(GpuMatSource source);
 
     cv::cuda::Stream l_strm, r_strm;
-    std::vector<GPUSenderPtr> senders;
-    std::unordered_map<std::string, boost::shared_ptr<cv::cuda::GpuMat> > gpu_mats;
+    std::vector<GPUSenderIfcPtr> senders;
+    std::unordered_map<std::string, boost::shared_ptr<cv::cuda::HostMem> > gpu_mats;
 
     image_geometry::StereoCameraModel model_;
 

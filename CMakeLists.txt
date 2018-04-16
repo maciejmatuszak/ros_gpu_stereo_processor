@@ -105,7 +105,9 @@ add_library(${PROJECT_NAME}
     src/GPUStereoProcessor.cpp
     src/StereoProcessor.cpp
     src/StereoProcessorNodelet.cpp
-    src/GpuSender.cpp
+    src/GpuSenderIfc.cpp
+    src/GpuSenderImage.cpp
+    src/GpuSenderDisparity.cpp
 
 )
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
