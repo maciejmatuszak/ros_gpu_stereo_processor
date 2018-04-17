@@ -8,13 +8,15 @@ namespace gpuimageproc
 class GPUSenderPc2 : public GPUSenderIfc
 {
   public:
-    GPUSenderPc2(const std_msgs::Header *header, const ros::Publisher *pub, cv::cuda::HostMem *imageHMem, cv::cuda::HostMem *colorHMem);
+    GPUSenderPc2(const std_msgs::Header *header, const ros::Publisher *pub, boost::shared_ptr<cv::cuda::HostMem> imageHMem, boost::shared_ptr<cv::cuda::HostMem> colorHMem);
 
     // GPUSenderIfc interface
-public:
+  public:
     void fillInData() override;
     void publish() override;
-private:
+    boost::shared_ptr<sensor_msgs::PointCloud2> getPointMessage();
+
+  private:
     bool isValidPoint(const cv::Vec3f &pt);
     boost::shared_ptr<cv::cuda::HostMem> pc2HMem_;
     boost::shared_ptr<cv::cuda::HostMem> colorHMem_;

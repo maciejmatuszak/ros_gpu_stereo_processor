@@ -1,19 +1,18 @@
 #pragma once
 
-#include <nodelet/nodelet.h>
 #include "gpuimageproc/StereoProcessor.h"
+#include <nodelet/nodelet.h>
 
 namespace gpuimageproc
 {
 
-class StereoProcNodelet: public nodelet::Nodelet
+class StereoProcNodelet : public nodelet::Nodelet
 {
-public:
+  public:
     void onInit();
 
-protected:
+  protected:
     boost::shared_ptr<StereoProcessor> stereoProcessorPtr;
 };
 
-} //nodelet
-
+} // nodelet

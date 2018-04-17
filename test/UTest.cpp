@@ -317,7 +317,8 @@ TEST_F(CudaStereoBMTf, DisparityGpu)
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_rect_gpu.png").string(), l_rect_gpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_r_rect_gpu.png").string(), r_rect_gpu);
     assert(sender->wasDataSent());
-    cv::Mat disp_gpu = sender->getCpuData();
+    auto hMemImage = sender->getDisparityHostMem();
+    cv::Mat disp_gpu = hMemImage->createMatHeader();
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu.png").string(), disp_gpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu_8u.png").string(), disparity_gpu_cv_8u);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_cpu.png").string(), disparity_cpu);
@@ -386,10 +387,10 @@ TEST_F(CudaStereoBMTf, PointCloud)
     const cv::Mat_<cv::Vec3f> points(l_points);
 
     stereo_processor_.waitForAllStreams();
-    auto point_msgPtr = sender->getPointsMessage();
-    ROS_INFO("POINTS:%d", point_msgPtr->height);
+    auto point_msgPtr = sender->getPointMessage();
 
-    cv::imshow("Disparity", l_disparity_8U);
+    //cv::imshow("Disparity", l_disparity_8U);
+    //cvWaitKey(0);
 }
 void handler(int sig)
 {

@@ -1,21 +1,24 @@
 #pragma once
 #include "gpuimageproc/GpuSenderIfc.h"
 #include <ros/ros.h>
-#include <stereo_msgs/DisparityImage.h>
 #include <sensor_msgs/image_encodings.h>
+#include <stereo_msgs/DisparityImage.h>
 
 namespace gpuimageproc
 {
 class GPUSenderDisparity : public GPUSenderIfc
 {
   public:
-    GPUSenderDisparity(const std_msgs::Header *header, const ros::Publisher *pub, cv::cuda::HostMem *imageHMem, int blockSize, int numDisparities, int minDisparity, double fx, double baseline);
+    GPUSenderDisparity(const std_msgs::Header *header, const ros::Publisher *pub, boost::shared_ptr<cv::cuda::HostMem> imageHMem, int blockSize, int numDisparities,
+                       int minDisparity, double fx, double baseline);
 
     // GPUSenderIfc interface
-public:
+  public:
     void fillInData() override;
     void publish() override;
-private:
+    boost::shared_ptr<cv::cuda::HostMem> getDisparityHostMem();
+
+  private:
     boost::shared_ptr<cv::cuda::HostMem> disparityHMem_;
     boost::shared_ptr<stereo_msgs::DisparityImage> disparity_msg_;
     int blockSize_;

@@ -9,13 +9,14 @@ namespace gpuimageproc
 class GPUSenderImage : public GPUSenderIfc
 {
   public:
-    GPUSenderImage(const std_msgs::Header *header, const ros::Publisher *pub, cv::cuda::HostMem *imageHMem, std::string encoding);
+    GPUSenderImage(const std_msgs::Header *header, const ros::Publisher *pub, boost::shared_ptr<cv::cuda::HostMem> imageHMem, std::string encoding);
 
     // GPUSenderIfc interface
-public:
+  public:
     void fillInData() override;
     void publish() override;
-private:
+
+  private:
     boost::shared_ptr<cv::cuda::HostMem> imageHMem_;
     boost::shared_ptr<sensor_msgs::Image> image_msg_;
 };

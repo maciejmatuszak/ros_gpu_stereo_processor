@@ -1,11 +1,11 @@
 #include "gpuimageproc/GpuSenderPc2.h"
-#include <sensor_msgs/point_cloud2_iterator.h>
 #include <image_geometry/stereo_camera_model.h>
+#include <sensor_msgs/point_cloud2_iterator.h>
 
 namespace gpuimageproc
 {
 
-GPUSenderPc2::GPUSenderPc2(const std_msgs::Header *header, const ros::Publisher *pub, cv::cuda::HostMem *pc2HMem, cv::cuda::HostMem *colorHMem)
+GPUSenderPc2::GPUSenderPc2(const std_msgs::Header *header, const ros::Publisher *pub, boost::shared_ptr<cv::cuda::HostMem> pc2HMem, boost::shared_ptr<cv::cuda::HostMem> colorHMem)
     : GPUSenderIfc(header, pub)
     , pc2HMem_(pc2HMem)
     , colorHMem_(colorHMem)
@@ -14,7 +14,7 @@ GPUSenderPc2::GPUSenderPc2(const std_msgs::Header *header, const ros::Publisher 
 
 void GPUSenderPc2::fillInData()
 {
-    points2_msg_         = boost::make_shared<sensor_msgs::PointCloud2>();
+    points2_msg_ = boost::make_shared<sensor_msgs::PointCloud2>();
 
     // fill in points
     const cv::Mat_<cv::Vec3f> xyz(pc2HMem_->rows, pc2HMem_->cols, (cv::Vec3f *)&pc2HMem_->data[0], pc2HMem_->step);
@@ -71,8 +71,15 @@ void GPUSenderPc2::fillInData()
     }
 }
 
-void GPUSenderPc2::publish() { publisher_->publish(points2_msg_); }
+void GPUSenderPc2::publish()
+{
+    if (publisher_)
+    {
+        publisher_->publish(points2_msg_);
+    }
+}
 
+boost::shared_ptr<sensor_msgs::PointCloud2> GPUSenderPc2::getPointMessage() { return points2_msg_; }
 
 inline bool GPUSenderPc2::isValidPoint(const cv::Vec3f &pt)
 {
