@@ -286,13 +286,13 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     //    cv::Mat disp;
     //    dgpu->download(disp);
     //    printStats("Disparity clean", disp);
-    dgpu32->create(dgpu->size(), CV_32FC1);
-    dgpu->createGpuMatHeader().convertTo(dgpu32->createGpuMatHeader(), CV_32FC1, inv_dpp, shift);
+    // dgpu32->create(dgpu->size(), CV_32FC1);
+    // dgpu->createGpuMatHeader().convertTo(dgpu32->createGpuMatHeader(), CV_32FC1, inv_dpp, shift);
     // dgpu->convertTo(*dgpu32, CV_32FC1, 1      , shift);
     double dur_convertToCV_32FC1 = perf_timer.elapsed() * 1000.0;
     perf_timer.restart();
-    ROS_DEBUG("computeDisparity; prep:%.3f;  disparity:%.3f;  convert to CV_32FC1:%.3f; TOTAL:%.2f ", dur_prep, dur_disparity, dur_convertToCV_32FC1,
-             (dur_prep + dur_disparity + dur_convertToCV_32FC1));
+    //    ROS_DEBUG("computeDisparity; prep:%.3f;  disparity:%.3f;  convert to CV_32FC1:%.3f; TOTAL:%.2f ", dur_prep, dur_disparity, dur_convertToCV_32FC1,
+    //             (dur_prep + dur_disparity + dur_convertToCV_32FC1));
 
     //    dgpu32->download(disp);
     //    printStats("Disparity scaled", disp);
@@ -351,9 +351,13 @@ void GpuStereoProcessor::waitForAllStreams()
 
 void GpuStereoProcessor::filterSpeckles(GpuMatSource disparity_src)
 {
-    getStream(disparity_src).waitForCompletion();
-    auto disHmem = getHostMem(disparity_src);
-    filterSpeckles(*disHmem);
+    if (maxSpeckleSize_ > 0)
+    {
+        getStream(disparity_src).waitForCompletion();
+        auto disHmem = getHostMem(disparity_src);
+
+        filterSpeckles(*disHmem);
+    }
 }
 
 void GpuStereoProcessor::filterSpeckles(cv::InputOutputArray disparity)
@@ -368,7 +372,12 @@ void GpuStereoProcessor::filterSpeckles(cv::InputOutputArray disparity)
     {
         _speclesBuf.reserveBuffer(bufSize);
     }
-    cv::filterSpeckles(disparity, 0, maxSpeckleSize_, maxSpeckleDiff_ , _speclesBuf);
+
+    cv::Mat disp16S;
+    cv::Mat temp = disparity.getMat();
+    temp.convertTo(disp16S, CV_16SC1);
+    cv::filterSpeckles(disp16S, 0, maxSpeckleSize_, maxSpeckleDiff_, _speclesBuf);
+    disp16S.convertTo(temp, CV_8UC1);
 }
 
 void GpuStereoProcessor::cleanSenders() { senders.clear(); }
