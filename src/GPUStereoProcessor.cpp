@@ -291,7 +291,7 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     // dgpu->convertTo(*dgpu32, CV_32FC1, 1      , shift);
     double dur_convertToCV_32FC1 = perf_timer.elapsed() * 1000.0;
     perf_timer.restart();
-    ROS_INFO("computeDisparity; prep:%.3f;  disparity:%.3f;  convert to CV_32FC1:%.3f; TOTAL:%.2f ", dur_prep, dur_disparity, dur_convertToCV_32FC1,
+    ROS_DEBUG("computeDisparity; prep:%.3f;  disparity:%.3f;  convert to CV_32FC1:%.3f; TOTAL:%.2f ", dur_prep, dur_disparity, dur_convertToCV_32FC1,
              (dur_prep + dur_disparity + dur_convertToCV_32FC1));
 
     //    dgpu32->download(disp);

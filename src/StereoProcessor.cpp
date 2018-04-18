@@ -293,7 +293,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     double dur_pc2             = (time_6_after_pc2 - time_5_after_disparity_image) * 1000.0;
     double dur_total           = time_6_after_pc2 * 1000.0;
 
-    ROS_INFO("TIMING [ms]: upload:%.2f; color convert:%.2f; rectify:%.2f; disparity:%.2f; disparity img:%.2f; pc2:%.2f; Total:%.2f;", dur_upload, dur_color_convert, dur_rectify,
+    ROS_DEBUG("TIMING [ms]: upload:%.2f; color convert:%.2f; rectify:%.2f; disparity:%.2f; disparity img:%.2f; pc2:%.2f; Total:%.2f;", dur_upload, dur_color_convert, dur_rectify,
              dur_disparity, dur_disparity_image, dur_pc2, dur_total);
 }
 
