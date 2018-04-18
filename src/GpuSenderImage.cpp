@@ -17,7 +17,9 @@ void GPUSenderImage::fillInData()
 
     image_msg_->height = imageHMem_->rows;
     image_msg_->width  = imageHMem_->cols;
-    image_msg_->step   = imageHMem_->step;
+    int bitdepth       = sensor_msgs::image_encodings::bitDepth(image_msg_->encoding);
+    int channels       = sensor_msgs::image_encodings::numChannels(image_msg_->encoding);
+    image_msg_->step   = image_msg_->width * bitdepth * channels / 8;
     image_msg_->data.resize(image_msg_->height * image_msg_->step);
     cv::Mat image_msg_Mat(imageHMem_->rows, imageHMem_->cols, imageHMem_->type(), &image_msg_->data[0], image_msg_->step);
     imageHMem_->createMatHeader().copyTo(image_msg_Mat);

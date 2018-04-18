@@ -5,6 +5,7 @@
     <arg name="bagfile_" default="mission_2018-04-09-18-29-02.bag/data/rosbag/depth_sample_bricks.bag"/>
 
     <arg name="run_gpu_node" default="true"/>
+    <arg name="run_cpu_node" default="true"/>
 
     <param name="use_sim_time" type="bool" value="true"/>
 
@@ -22,24 +23,25 @@
             /loitor_stereo_visensor/right/camera_info
             --bags $(arg bagfile)"
         output="screen">
-     </node>
-     <node
-         pkg="rviz"
-         type="rviz"
-         name="rviz"
-         args="
-             -d $(find gpuimageproc)/launch/rviz.rviz"
-         output="screen">
-      </node>
-     <node
-         pkg="stereo_image_proc"
-         type="stereo_image_proc"
-         name="stereo_ros"
-         ns="/loitor_stereo_visensor"
-         args=""
-         output="screen"
-     >
-     </node>
+    </node>
+    <node
+        pkg="rviz"
+        type="rviz"
+        name="rviz"
+        args="
+        -d $(find gpuimageproc)/launch/rviz.rviz"
+        output="screen">
+    </node>
+    <group if="$(arg run_cpu_node)">
+        <node
+            pkg="stereo_image_proc"
+            type="stereo_image_proc"
+            name="stereo_ros"
+            ns="/loitor_stereo_visensor"
+            args=""
+            output="screen">
+        </node>
+    </group>
 
     <group if="$(arg run_gpu_node)">
         <node

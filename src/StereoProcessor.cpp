@@ -20,6 +20,7 @@ const std::string StereoProcessor::CAMERA_TOPIC_INFO  = "/camera_info";
 StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
     : nh(nh)
     , private_nh(private_nh)
+    , camera_info_from_files_(false)
 {
     stereoProcessor_        = boost::make_shared<GpuStereoProcessor>();
     camera_info_file_left_  = "";
@@ -174,11 +175,10 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     // Create cv::Mat views onto all buffers
     auto l_cpu_raw = cv_bridge::toCvShare(l_raw_msg, l_raw_msg->encoding);
     auto r_cpu_raw = cv_bridge::toCvShare(r_raw_msg, r_raw_msg->encoding);
-    cv::cuda::registerPageLocked(const_cast<cv::Mat &>(l_cpu_raw->image));
-    cv::cuda::registerPageLocked(const_cast<cv::Mat &>(r_cpu_raw->image));
 
     stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_L_RAW, l_cpu_raw->image, l_cpu_raw->encoding);
     stereoProcessor_->uploadMat(GpuMatSource::GPU_MAT_SRC_R_RAW, r_cpu_raw->image, r_cpu_raw->encoding);
+    double time_1_after_upload = perf_timer.elapsed();
 
     if (connected_.DebayerMonoLeft || connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
@@ -215,6 +215,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     {
         stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_right_);
     }
+    double time_2_after_color_convert = perf_timer.elapsed();
 
     if (connected_.RectifyMonoLeft || connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
@@ -253,16 +254,19 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     {
         stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_R_RECT_COLOR, r_raw_msg, sensor_msgs::image_encodings::BGR8, &pub_color_rect_right_);
     }
+    double time_3_after_rectify = perf_timer.elapsed();
 
     if (connected_.Disparity || connected_.DisparityVis || connected_.Pointcloud)
     {
         stereoProcessor_->computeDisparity(GPU_MAT_SRC_L_RECT_MONO, GPU_MAT_SRC_R_RECT_MONO, GPU_MAT_SRC_L_DISPARITY);
+        stereoProcessor_->filterSpeckles(GPU_MAT_SRC_L_DISPARITY);
     }
 
     if (connected_.Disparity)
     {
         stereoProcessor_->enqueueSendDisparity(GPU_MAT_SRC_L_DISPARITY, l_raw_msg, &pub_disparity_);
     }
+    double time_4_after_disparity = perf_timer.elapsed();
 
     if (connected_.DisparityVis)
     {
@@ -270,6 +274,7 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
         stereoProcessor_->enqueueSendImage(GPU_MAT_SRC_L_DISPARITY_IMG, l_raw_msg, sensor_msgs::image_encodings::BGRA8, &pub_disparity_vis_);
     }
 
+    double time_5_after_disparity_image = perf_timer.elapsed();
     if (connected_.Pointcloud)
     {
         stereoProcessor_->projectDisparityTo3DPoints(GPU_MAT_SRC_L_DISPARITY, GPU_MAT_SRC_L_POINTS2);
@@ -277,10 +282,19 @@ void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const
     }
 
     stereoProcessor_->waitForAllStreams();
-    double duration = perf_timer.elapsed();
-    ROS_DEBUG("Image Callback took: %.2f [ms]", duration * 1000.0);
-    cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(l_cpu_raw->image));
-    cv::cuda::unregisterPageLocked(const_cast<cv::Mat &>(r_cpu_raw->image));
+    stereoProcessor_->cleanSenders();
+    double time_6_after_pc2 = perf_timer.elapsed();
+
+    double dur_upload          = time_1_after_upload * 1000.0;
+    double dur_color_convert   = (time_2_after_color_convert - time_1_after_upload) * 1000.0;
+    double dur_rectify         = (time_3_after_rectify - time_2_after_color_convert) * 1000.0;
+    double dur_disparity       = (time_4_after_disparity - time_3_after_rectify) * 1000.0;
+    double dur_disparity_image = (time_5_after_disparity_image - time_4_after_disparity) * 1000.0;
+    double dur_pc2             = (time_6_after_pc2 - time_5_after_disparity_image) * 1000.0;
+    double dur_total           = time_6_after_pc2 * 1000.0;
+
+    ROS_INFO("TIMING [ms]: upload:%.2f; color convert:%.2f; rectify:%.2f; disparity:%.2f; disparity img:%.2f; pc2:%.2f; Total:%.2f;", dur_upload, dur_color_convert, dur_rectify,
+             dur_disparity, dur_disparity_image, dur_pc2, dur_total);
 }
 
 inline bool isValidPoint(const cv::Vec3f &pt)
