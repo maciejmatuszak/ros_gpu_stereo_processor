@@ -80,6 +80,7 @@ class GpuStereoProcessor
     void rectifyImageLeft(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void rectifyImageRight(const cv::Mat &source, cv::Mat &dest, cv::InterpolationFlags interpolation);
     void computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity);
+    void computeDisparityBare(cv::InputArray left, cv::InputArray right, cv::OutputArray disparity);
     void computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest);
     void computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity);
     void projectDisparityTo3DPoints(GpuMatSource disparity_src, GpuMatSource points_src);
@@ -102,7 +103,7 @@ class GpuStereoProcessor
     double getMaxSpeckleDiff() const;
     void setMaxSpeckleDiff(double maxSpeckleDiff);
 
-  protected:
+protected:
     boost::shared_ptr<cv::cuda::HostMem> getHostMem(GpuMatSource source);
     cv::cuda::Stream &getStream(GpuMatSource source);
 

@@ -2,6 +2,7 @@
 #include "gpuimageproc/GpuSenderDisparity.h"
 #include "gpuimageproc/GpuSenderImage.h"
 #include "gpuimageproc/GpuSenderPc2.h"
+#include <boost/timer.hpp>
 #include <camera_calibration_parsers/parse.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -155,7 +156,7 @@ void GpuStereoProcessor::convertColor(GpuMatSource mat_source, GpuMatSource mat_
         else
         {
             // Perform color conversion
-            int dcn = sensor_msgs::image_encodings::numChannels(dst_encoding);
+            int dcn         = sensor_msgs::image_encodings::numChannels(dst_encoding);
             int image2_type = cv_bridge::getCvType(dst_encoding);
 
             dstMat->create(srcMat->rows, srcMat->cols, image2_type);
@@ -258,6 +259,7 @@ void GpuStereoProcessor::rectifyImageRight(const cv::Mat &source, cv::Mat &dest,
 
 void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right, GpuMatSource disparity)
 {
+    boost::timer perf_timer;
     assert(model_.initialized());
     // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
     static const int DPP        = 16; // disparities per pixel
@@ -272,8 +274,11 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     GpuMatSource disparity_f32 = static_cast<GpuMatSource>((disparity & GPU_MAT_SIDE_MASK) | GPU_MAT_SRC_DISPARITY_32F);
     auto dgpu32                = getHostMem(disparity_f32);
 
+    double dur_prep = perf_timer.elapsed() * 1000.0;
+    perf_timer.restart();
     block_matcher_gpu_->compute(*lgpu, *rgpu, *dgpu, getStream(disparity));
-
+    double dur_disparity = perf_timer.elapsed() * 1000.0;
+    perf_timer.restart();
     //         side left or right \___________________________/    ^---plus disparity 32F selector
     // TODO:the x offset will be different for right side for now just use assert to prevent the use of Right disparity
     assert((disparity & GPU_MAT_SIDE_MASK) == GPU_MAT_SIDE_L);
@@ -284,9 +289,31 @@ void GpuStereoProcessor::computeDisparity(GpuMatSource left, GpuMatSource right,
     dgpu32->create(dgpu->size(), CV_32FC1);
     dgpu->createGpuMatHeader().convertTo(dgpu32->createGpuMatHeader(), CV_32FC1, inv_dpp, shift);
     // dgpu->convertTo(*dgpu32, CV_32FC1, 1      , shift);
+    double dur_convertToCV_32FC1 = perf_timer.elapsed() * 1000.0;
+    perf_timer.restart();
+    ROS_INFO("computeDisparity; prep:%.3f;  disparity:%.3f;  convert to CV_32FC1:%.3f; TOTAL:%.2f ", dur_prep, dur_disparity, dur_convertToCV_32FC1,
+             (dur_prep + dur_disparity + dur_convertToCV_32FC1));
 
     //    dgpu32->download(disp);
     //    printStats("Disparity scaled", disp);
+}
+
+void GpuStereoProcessor::computeDisparityBare(cv::InputArray left, cv::InputArray right, cv::OutputArray disparity)
+{
+    assert(model_.initialized());
+
+    block_matcher_gpu_->compute(left, right, disparity);
+}
+
+void GpuStereoProcessor::computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity)
+{
+    assert(model_.initialized());
+    // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
+    static const int DPP        = 16; // disparities per pixel
+    static const double inv_dpp = 1.0 / DPP;
+
+    block_matcher_cpu_->compute(left, right, disparity);
+    disparity.convertTo(disparity, CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
 }
 
 void GpuStereoProcessor::computeDisparityImage(GpuMatSource disparity_src, GpuMatSource disp_image_dest)
@@ -303,26 +330,15 @@ void GpuStereoProcessor::projectDisparityTo3DPoints(GpuMatSource disparity_src, 
 
     assert(model_.initialized());
 
-    auto disp_gpu = getHostMem(disparity_src);
+    auto disp_gpu       = getHostMem(disparity_src);
     auto points_src_gpu = getHostMem(points_src);
-    auto strm     = getStream(disparity_src);
+    auto strm           = getStream(disparity_src);
 
-    model_.projectDisparityImageTo3dGPU(*disp_gpu,            /* disparity gpu mat */
-                                        *points_src_gpu,  /* points gpu mat */
-                                        true,                    /* handle missing points */
-                                        strm /* gpu stream */
+    model_.projectDisparityImageTo3dGPU(*disp_gpu,       /* disparity gpu mat */
+                                        *points_src_gpu, /* points gpu mat */
+                                        true,            /* handle missing points */
+                                        strm             /* gpu stream */
                                         );
-}
-
-void GpuStereoProcessor::computeDisparity(cv::Mat &left, cv::Mat &right, cv::Mat &disparity)
-{
-    assert(model_.initialized());
-    // Fixed-point disparity is 16 times the true value: d = d_fp / 16.0 = x_l - x_r.
-    static const int DPP        = 16; // disparities per pixel
-    static const double inv_dpp = 1.0 / DPP;
-
-    block_matcher_cpu_->compute(left, right, disparity);
-    disparity.convertTo(disparity, CV_32FC1, inv_dpp, -(model_.left().cx() - model_.right().cx()));
 }
 
 void GpuStereoProcessor::waitForStream(GpuMatSource stream_source) { getStream(stream_source).waitForCompletion(); }

@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <opencv2/core.hpp>
+#include <boost/timer.hpp>
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <stdio.h>
@@ -69,6 +70,9 @@ class CudaStereoBMTf : public testing::Test
         auto left_file  = (test_data_path / "stereobm/test_data/left.yaml").string();
         auto right_file = (test_data_path / "stereobm/test_data/right.yaml").string();
         stereo_processor_.initStereoModel(left_file, right_file);
+        stereo_processor_.setPreFilterType(cv::cuda::StereoBM::PREFILTER_XSOBEL);
+        stereo_processor_.setMaxSpeckleDiff(200);
+        stereo_processor_.setMaxSpeckleSize(200);
     }
 
     void configureProcessor()
@@ -317,7 +321,7 @@ TEST_F(CudaStereoBMTf, DisparityGpu)
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_rect_gpu.png").string(), l_rect_gpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_r_rect_gpu.png").string(), r_rect_gpu);
     assert(sender->wasDataSent());
-    auto hMemImage = sender->getDisparityHostMem();
+    auto hMemImage   = sender->getDisparityHostMem();
     cv::Mat disp_gpu = hMemImage->createMatHeader();
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu.png").string(), disp_gpu);
     cv::imwrite((test_data_path / "stereobm/DisparityGpu_l_disp_gpu_8u.png").string(), disparity_gpu_cv_8u);
@@ -389,9 +393,41 @@ TEST_F(CudaStereoBMTf, PointCloud)
     stereo_processor_.waitForAllStreams();
     auto point_msgPtr = sender->getPointMessage();
 
-    //cv::imshow("Disparity", l_disparity_8U);
-    //cvWaitKey(0);
+    // cv::imshow("Disparity", l_disparity_8U);
+    // cvWaitKey(0);
 }
+
+TEST_F(CudaStereoBMTf, DisparityTiming)
+{
+    loadImagesKitchen();
+    initStereoModelKitchen();
+    cv::cuda::HostMem lHM(cv::cuda::HostMem::SHARED);
+    cv::cuda::HostMem rHM(cv::cuda::HostMem::SHARED);
+    cv::cuda::HostMem dHM(cv::cuda::HostMem::SHARED);
+    cv::cuda::GpuMat lGpuMat, rGpuMat, dGpuMat;
+
+    lHM.create(l_rect_.rows, l_rect_.cols, l_rect_.type());
+    l_rect_.copyTo(lHM.createMatHeader());
+    rHM.create(r_rect_.rows, r_rect_.cols, r_rect_.type());
+    r_rect_.copyTo(rHM.createMatHeader());
+    rHM.create(l_rect_.rows, l_rect_.cols, r_rect_.type());
+    dHM.create(l_rect_.rows, l_rect_.cols, CV_8UC1);
+
+    lGpuMat.upload(l_rect_);
+    rGpuMat.upload(r_rect_);
+    dGpuMat.create(l_rect_.rows, l_rect_.cols,CV_8UC1);
+
+    boost::timer perf_timer;
+    stereo_processor_.computeDisparityBare(lHM,rHM,dHM);
+    double dur_HMem = perf_timer.elapsed();
+    perf_timer.restart();
+    stereo_processor_.computeDisparityBare(lGpuMat,rGpuMat,dGpuMat);
+    double dur_GpuMat = perf_timer.elapsed();
+    std::cout << "compute disparity on HostMem:" << (dur_HMem * 1000.0) << std::endl;
+    std::cout << "compute disparity on GpuMat:" << (dur_GpuMat * 1000.0) << std::endl;
+
+}
+
 void handler(int sig)
 {
     void *array[10];
