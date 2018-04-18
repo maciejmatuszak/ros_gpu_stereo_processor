@@ -368,7 +368,7 @@ void GpuStereoProcessor::filterSpeckles(cv::InputOutputArray disparity)
     {
         _speclesBuf.reserveBuffer(bufSize);
     }
-    cv::filterSpeckles(disparity, 0, maxSpeckleSize_, maxSpeckleDiff_ * 256, _speclesBuf);
+    cv::filterSpeckles(disparity, 0, maxSpeckleSize_, maxSpeckleDiff_ , _speclesBuf);
 }
 
 void GpuStereoProcessor::cleanSenders() { senders.clear(); }
