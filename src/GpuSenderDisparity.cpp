@@ -21,10 +21,11 @@ void GPUSenderDisparity::fillInData()
     disparity_msg_         = boost::make_shared<stereo_msgs::DisparityImage>();
     disparity_msg_->header = disparity_msg_->image.header = *header_;
     disparity_msg_->image.encoding                        = sensor_msgs::image_encodings::TYPE_32FC1;
-
+    int bitdepth       = sensor_msgs::image_encodings::bitDepth(sensor_msgs::image_encodings::TYPE_32FC1);
+    int channels       = sensor_msgs::image_encodings::numChannels(sensor_msgs::image_encodings::TYPE_32FC1);
     disparity_msg_->image.height = disparityHMem_->rows;
     disparity_msg_->image.width  = disparityHMem_->cols;
-    disparity_msg_->image.step   = disparityHMem_->step;
+    disparity_msg_->image.step   = disparity_msg_->image.width * bitdepth * channels / 8;
     // Compute window of (potentially) valid disparities
     int border                            = blockSize_ / 2;
     int left                              = numDisparities_ + minDisparity_ + border - 1;

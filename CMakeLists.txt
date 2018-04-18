@@ -19,7 +19,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(OpenCV 
-    PATHS /usr/local_ros
+    PATHS /usr/local_debug_ros
     NO_DEFAULT_PATH 
     REQUIRED)
 message(STATUS "OpenCV_INCLUDE_DIRS: ${OpenCV_INCLUDE_DIRS}")
