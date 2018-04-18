@@ -156,9 +156,9 @@ void StereoProcessor::imageAndInfoCb(const sensor_msgs::ImageConstPtr &l_raw_msg
 
 void StereoProcessor::imageCb(const sensor_msgs::ImageConstPtr &l_raw_msg, const sensor_msgs::ImageConstPtr &r_raw_msg)
 {
+    boost::timer perf_timer;
     boost::lock_guard<boost::recursive_mutex> config_lock(config_mutex_);
     boost::lock_guard<boost::mutex> connect_lock(connect_mutex_);
-    boost::timer perf_timer;
     int level = connected_.level();
     ROS_DEBUG("got images, level %d", level);
 
