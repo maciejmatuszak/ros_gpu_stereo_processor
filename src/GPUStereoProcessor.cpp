@@ -44,8 +44,8 @@ void GpuStereoProcessor::initStereoModel(const sensor_msgs::CameraInfo &l_info_m
     l_cam_name_ = "left";
     l_cam_name_ = "right";
     model_.fromCameraInfo(l_info_msg, r_info_msg);
-    double fov_horizontal = std::atan2(((double)model_.left().cameraInfo().width) / 2.0, model_.left().fx()) * 180.0 / M_PI;
-    double fov_vert       = std::atan2(((double)model_.left().cameraInfo().height) / 2.0, model_.left().fy()) * 180.0 / M_PI;
+    double fov_horizontal = 2.0 * std::atan2(((double)model_.left().cameraInfo().width) / 2.0, model_.left().fx()) * 180.0 / M_PI;
+    double fov_vert       = 2.0 * std::atan2(((double)model_.left().cameraInfo().height) / 2.0, model_.left().fy()) * 180.0 / M_PI;
 
     ROS_INFO("Left Cam FOV Horiz: %f", fov_horizontal);
     ROS_INFO("Left Cam FOV Vert : %f", fov_vert);
