@@ -65,7 +65,7 @@ class GpuStereoProcessor
   public:
     GpuStereoProcessor();
 
-    void initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg);
+    void initStereoModel(const sensor_msgs::CameraInfo &l_info_msg, const sensor_msgs::CameraInfo &r_info_msg);
     void initStereoModel(const std::string &left_cal_file, const std::string &right_cal_file);
     bool isStereoModelInitialised();
     void convertRawToColor(GpuMatSource side);

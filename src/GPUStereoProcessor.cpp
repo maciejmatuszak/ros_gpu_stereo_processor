@@ -38,13 +38,18 @@ GpuStereoProcessor::GpuStereoProcessor()
     block_matcher_cpu_->setUniquenessRatio(block_matcher_gpu_->getUniquenessRatio());
 }
 
-void GpuStereoProcessor::initStereoModel(const sensor_msgs::CameraInfoConstPtr &l_info_msg, const sensor_msgs::CameraInfoConstPtr &r_info_msg)
+void GpuStereoProcessor::initStereoModel(const sensor_msgs::CameraInfo &l_info_msg, const sensor_msgs::CameraInfo &r_info_msg)
 {
     // Update the camera model
     l_cam_name_ = "left";
     l_cam_name_ = "right";
     model_.fromCameraInfo(l_info_msg, r_info_msg);
-    ROS_INFO("camera model initialised from messages");
+    double fov_horizontal = std::atan2(((double)model_.left().cameraInfo().width) / 2.0, model_.left().fx()) * 180.0 / M_PI;
+    double fov_vert       = std::atan2(((double)model_.left().cameraInfo().height) / 2.0, model_.left().fy()) * 180.0 / M_PI;
+
+    ROS_INFO("Left Cam FOV Horiz: %f", fov_horizontal);
+    ROS_INFO("Left Cam FOV Vert : %f", fov_vert);
+    ROS_INFO("camera model initialised");
 }
 
 void GpuStereoProcessor::initStereoModel(const std::string &left_cal_file, const std::string &right_cal_file)
@@ -52,8 +57,7 @@ void GpuStereoProcessor::initStereoModel(const std::string &left_cal_file, const
     sensor_msgs::CameraInfo l_info, r_info;
     camera_calibration_parsers::readCalibration(left_cal_file, l_cam_name_, l_info);
     camera_calibration_parsers::readCalibration(right_cal_file, r_cam_name, r_info);
-    model_.fromCameraInfo(l_info, r_info);
-    ROS_INFO("camera model initialised from files");
+    initStereoModel(l_info, r_info);
 }
 
 bool GpuStereoProcessor::isStereoModelInitialised() { return model_.initialized(); }

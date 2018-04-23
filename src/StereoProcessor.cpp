@@ -148,7 +148,7 @@ void StereoProcessor::imageAndInfoCb(const sensor_msgs::ImageConstPtr &l_raw_msg
     {
         if (!camera_info_from_files_)
         {
-            stereoProcessor_->initStereoModel(l_info_msg, r_info_msg);
+            stereoProcessor_->initStereoModel(*l_info_msg, *r_info_msg);
         }
     }
     imageCb(l_raw_msg, r_raw_msg);
