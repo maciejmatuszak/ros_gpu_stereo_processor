@@ -20,6 +20,7 @@ const std::string StereoProcessor::CAMERA_TOPIC_INFO  = "/camera_info";
 StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_nh)
     : nh(nh)
     , private_nh(private_nh)
+    , it(private_nh)
     , camera_info_from_files_(false)
 {
     stereoProcessor_        = boost::make_shared<GpuStereoProcessor>();
@@ -91,7 +92,7 @@ StereoProcessor::StereoProcessor(ros::NodeHandle &nh, ros::NodeHandle &private_n
     pub_mono_right_       = private_nh.advertise<sensor_msgs::Image>("right/image_mono", publisher_queue_size, connect_cb, connect_cb);
     pub_color_left_       = private_nh.advertise<sensor_msgs::Image>("left/image_color", publisher_queue_size, connect_cb, connect_cb);
     pub_color_right_      = private_nh.advertise<sensor_msgs::Image>("right/image_color", publisher_queue_size, connect_cb, connect_cb);
-    pub_mono_rect_left_   = private_nh.advertise<sensor_msgs::Image>("left/rect_mono", publisher_queue_size, connect_cb, connect_cb);
+    pub_mono_rect_left_   = it.advertiseCamera("left/rect_mono", publisher_queue_size, connect_cb, connect_cb);
     pub_color_rect_left_  = private_nh.advertise<sensor_msgs::Image>("left/rect_color", publisher_queue_size, connect_cb, connect_cb);
     pub_mono_rect_right_  = private_nh.advertise<sensor_msgs::Image>("right/rect_mono", publisher_queue_size, connect_cb, connect_cb);
     pub_color_rect_right_ = private_nh.advertise<sensor_msgs::Image>("right/rect_color", publisher_queue_size, connect_cb, connect_cb);

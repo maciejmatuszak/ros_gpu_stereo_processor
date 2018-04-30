@@ -61,13 +61,14 @@ class StereoProcessor
     boost::shared_ptr<ApproximateSyncImages> approximate_sync_images_;
     boost::shared_ptr<ApproximateSyncImagesAndInfo> approximate_sync_images_and_info_;
 
+    image_transport::ImageTransport it;
     // Publications
     boost::mutex connect_mutex_;
     ros::Publisher pub_mono_left_;
     ros::Publisher pub_mono_right_;
     ros::Publisher pub_color_left_;
     ros::Publisher pub_color_right_;
-    ros::Publisher pub_mono_rect_left_;
+    image_transport::CameraPublisher pub_mono_rect_left_;
     ros::Publisher pub_mono_rect_right_;
     ros::Publisher pub_color_rect_left_;
     ros::Publisher pub_color_rect_right_;
